@@ -4,13 +4,13 @@ import { initializeApp, getApps } from "firebase/app";
 import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  authDomain: "your-project.firebaseapp.com",
-  databaseURL: "https://your-project-default-rtdb.firebaseio.com",
-  projectId: "your-project",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:xxxxxxxxxxxxxxxxxxxxxxxx",
+  apiKey: "AIzaSyDRoQRCV7fr-1yN071g8Vdi2u1sOvEtHBA",
+  authDomain: "workshop-culture.firebaseapp.com",
+  projectId: "workshop-culture",
+  storageBucket: "workshop-culture.firebasestorage.app",
+  messagingSenderId: "741916433991",
+  appId: "1:741916433991:web:b401d078c3446d591f9b62",
+  measurementId: "G-9QSHBP1GJV"
 };
 
 // Tránh khởi tạo nhiều lần trong Next.js dev mode
