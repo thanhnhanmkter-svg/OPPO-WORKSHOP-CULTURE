@@ -16,6 +16,33 @@ function normalizeText(str) {
   return str.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/\s+/g, " ");
 }
 
+// ── Stage Transition Wrapper ──────────────────────────────────────────────────
+function StageTransition({ stage, children }) {
+  const [visible, setVisible] = useState(true);
+  const [content, setContent] = useState(children);
+  const prevStage = useRef(stage);
+
+  useEffect(() => {
+    if (prevStage.current !== stage) {
+      setVisible(false);
+      const t = setTimeout(() => {
+        setContent(children);
+        prevStage.current = stage;
+        setVisible(true);
+      }, 300);
+      return () => clearTimeout(t);
+    } else {
+      setContent(children);
+    }
+  }, [stage, children]);
+
+  return (
+    <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s ease" }}>
+      {content}
+    </div>
+  );
+}
+
 // ── Login ─────────────────────────────────────────────────────────────────────
 function StageLogin({ onJoin }) {
   const [name, setName] = useState(""); const [dept, setDept] = useState(""); const [loading, setLoading] = useState(false);
@@ -217,9 +244,9 @@ function StageGiaiMaHanhVi({ userId, userName, sessionData }) {
           const isSelected = answers[currentView] === ans;
           return (
             <button key={ans} onClick={() => setAnswers((a) => ({ ...a, [currentView]: ans }))}
-              className={`h-16 rounded-2xl font-bold text-sm px-3 active:scale-95 transition-all bg-gradient-to-br ${COLORS[ans]} text-white ${isSelected ? "ring-2 ring-white/40 scale-105 shadow-lg" : "opacity-60 hover:opacity-90"}`}>
+              className={`min-h-16 rounded-2xl font-bold text-sm px-3 py-2 active:scale-95 transition-all bg-gradient-to-br ${COLORS[ans]} text-white ${isSelected ? "ring-2 ring-white/40 scale-105 shadow-lg" : "opacity-60 hover:opacity-90"}`}>
               <span className="block text-lg font-black">{ans}</span>
-              <span className="block text-xs leading-tight">{q[`opt${ans}`]}</span>
+              <span className="block text-xs leading-tight break-words whitespace-normal">{q[`opt${ans}`]}</span>
             </button>
           );
         })}
@@ -233,58 +260,167 @@ function StageGiaiMaHanhVi({ userId, userName, sessionData }) {
   );
 }
 
-// ── Stage 4: Thảo Luận Nhóm ───────────────────────────────────────────────────
+// ── Stage 4: Thảo Luận Nhóm — Card Flip ──────────────────────────────────────
+const CARD_THEMES = [
+  { icon: "🎯", label: "BỔN PHẬN", color: "from-emerald-500 to-green-400", back: "from-emerald-900 to-green-900" },
+  { icon: "🤝", label: "HƯỚNG ĐẾN\nKHÁCH HÀNG", color: "from-teal-500 to-cyan-400", back: "from-teal-900 to-cyan-900" },
+  { icon: "⭐", label: "THEO ĐUỔI\nSỰ XUẤT SẮC", color: "from-green-500 to-emerald-400", back: "from-green-900 to-emerald-900" },
+  { icon: "🏆", label: "HƯỚNG ĐẾN\nKẾT QUẢ", color: "from-cyan-500 to-teal-400", back: "from-cyan-900 to-teal-900" },
+];
+
+function CardFlip({ theme, flipped, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{ perspective: "800px", cursor: flipped ? "default" : "pointer" }}
+      className="w-full aspect-[3/4]"
+    >
+      <div style={{
+        position: "relative", width: "100%", height: "100%",
+        transformStyle: "preserve-3d",
+        transition: "transform 0.6s cubic-bezier(.4,2,.6,1)",
+        transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+      }}>
+        {/* Back side (face down) */}
+        <div style={{ backfaceVisibility: "hidden", position: "absolute", inset: 0 }}
+          className={`rounded-2xl bg-gradient-to-br ${theme.back} border-2 border-white/10 flex items-center justify-center shadow-xl`}>
+          <span className="text-4xl opacity-30">🎴</span>
+        </div>
+        {/* Front side (face up) */}
+        <div style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)", position: "absolute", inset: 0 }}
+          className={`rounded-2xl bg-gradient-to-br ${theme.color} flex flex-col items-center justify-center gap-2 p-3 shadow-xl`}>
+          <span className="text-3xl">{theme.icon}</span>
+          <p className="text-white font-black text-xs text-center leading-tight whitespace-pre-line">{theme.label}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StageCardReveal({ onDone }) {
+  const [flipped, setFlipped] = useState([false, false, false, false]);
+  const allFlipped = flipped.every(Boolean);
+
+  function flipCard(i) {
+    setFlipped((prev) => prev.map((v, idx) => idx === i ? true : v));
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 flex flex-col px-4 py-8 gap-6">
+      <div className="text-center">
+        <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-full px-4 py-1.5 mb-3">
+          <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+          <span className="text-orange-400 text-xs font-semibold tracking-widest">STAGE 4 — THẢO LUẬN NHÓM</span>
+        </div>
+        <h2 className="text-xl font-black text-white">Lật bài để khám phá</h2>
+        <p className="text-gray-400 text-sm mt-1">4 giá trị văn hóa OPPO</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 flex-1">
+        {CARD_THEMES.map((theme, i) => (
+          <CardFlip key={i} theme={theme} flipped={flipped[i]} onClick={() => flipCard(i)} />
+        ))}
+      </div>
+
+      <button
+        onClick={onDone}
+        disabled={!allFlipped}
+        className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-400 text-white font-black text-lg disabled:opacity-30 active:scale-95 transition-all shadow-lg"
+      >
+        {allFlipped ? "Bắt đầu thảo luận →" : `Lật hết ${flipped.filter(Boolean).length}/4 lá bài`}
+      </button>
+    </div>
+  );
+}
+
 function StageThaoLuanNhom({ userId, sessionData }) {
   const groups = sessionData?.groups || [];
   const activeGroup = sessionData?.activeGroup || null;
-  const [heartCount, setHeartCount] = useState(0); const [burst, setBurst] = useState(false);
+  const [heartCount, setHeartCount] = useState(0);
+  const [burst, setBurst] = useState(false);
+  // FIX 1: cardsRevealed dùng localStorage để chỉ show 1 lần
+  const [cardsRevealed, setCardsRevealed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("s4_cards_revealed") === "true";
+  });
+
   const myGroup = groups.find((g) => (g.members || []).includes(userId));
-  const isActive = myGroup && myGroup.id === activeGroup;
+  const activeGroupData = groups.find((g) => g.id === activeGroup);
 
-  useEffect(() => { const u = onValue(ref(db, "groupHearts"), (s) => setHeartCount(s.exists() ? Object.keys(s.val()).length : 0)); return () => u(); }, []);
+  useEffect(() => {
+    const u = onValue(ref(db, "groupHearts"), (s) => setHeartCount(s.exists() ? Object.keys(s.val()).length : 0));
+    return () => u();
+  }, []);
 
+  function handleCardsDone() {
+    localStorage.setItem("s4_cards_revealed", "true");
+    setCardsRevealed(true);
+  }
+
+  // FIX 1: Bỏ điều kiện isActive — ai cũng tim được
   async function sendHeart() {
-    if (!isActive) return;
     setBurst(true); setTimeout(() => setBurst(false), 500);
     await push(ref(db, "groupHearts"), { userId, ts: Date.now() });
   }
 
-  const activeGroupData = groups.find((g) => g.id === activeGroup);
+  if (!cardsRevealed) {
+    return <StageCardReveal onDone={handleCardsDone} />;
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 flex flex-col items-center justify-center gap-6 px-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 flex flex-col px-4 py-6 gap-5">
+      {/* Header */}
       <div className="text-center">
-        <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-full px-4 py-1.5 mb-4">
+        <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-full px-4 py-1.5 mb-2">
           <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
           <span className="text-orange-400 text-xs font-semibold tracking-widest">STAGE 4 — THẢO LUẬN NHÓM</span>
         </div>
         {myGroup ? (
-          <div><h2 className="text-2xl font-black text-white">Nhóm của bạn:</h2><p className="text-3xl font-black text-orange-400 mt-1">{myGroup.name}</p></div>
+          <div>
+            <p className="text-gray-400 text-sm">Nhóm của bạn:</p>
+            <p className="text-2xl font-black text-orange-400">{myGroup.name}</p>
+          </div>
         ) : (
-          <p className="text-gray-400 text-sm">Chờ Host chia nhóm…</p>
+          <p className="text-gray-400 text-sm mt-1">Chờ Host chia nhóm…</p>
         )}
       </div>
 
+      {/* Đang trình bày */}
       {activeGroupData ? (
-        <div className="text-center">
-          <p className="text-gray-400 text-sm mb-2">Đang trình bày:</p>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center space-y-4">
+          <p className="text-gray-400 text-sm">Đang trình bày:</p>
           <p className="text-2xl font-black text-white">{activeGroupData.name}</p>
-          {isActive ? (
-            <div className="mt-6 flex flex-col items-center gap-4">
-              <p className="text-emerald-400 text-sm font-semibold">🎤 Nhóm bạn đang trình bày!</p>
-              <button onClick={sendHeart} className={`w-24 h-24 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 text-5xl flex items-center justify-center shadow-xl active:scale-90 transition-all ${burst ? "scale-110" : "scale-100"}`}>❤️</button>
-              <p className="text-white font-black text-xl">{heartCount} <span className="text-gray-400 text-sm font-normal">tim ủng hộ</span></p>
-            </div>
-          ) : (
-            <div className="mt-6 flex flex-col items-center gap-4">
-              <p className="text-gray-400 text-sm">Thả tim ủng hộ nhóm đang trình bày!</p>
-              <button onClick={sendHeart} className={`w-24 h-24 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 text-5xl flex items-center justify-center shadow-xl active:scale-90 transition-all ${burst ? "scale-110" : "scale-100"}`}>❤️</button>
-              <p className="text-white font-black text-xl">{heartCount} <span className="text-gray-400 text-sm font-normal">tim</span></p>
-            </div>
-          )}
+          <p className="text-gray-400 text-sm">Thả tim ủng hộ nhóm! ❤️</p>
+          {/* FIX 1: Nút tim luôn hoạt động cho tất cả */}
+          <button
+            onClick={sendHeart}
+            className={`w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-rose-500 to-pink-600 text-4xl flex items-center justify-center shadow-xl active:scale-90 transition-all ${burst ? "scale-110" : "scale-100"}`}
+          >❤️</button>
+          <p className="text-white font-black text-2xl">{heartCount} <span className="text-gray-400 text-sm font-normal">tim</span></p>
         </div>
       ) : (
-        <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" /><span className="text-orange-400 text-sm">Chờ Host chọn nhóm trình bày…</span></div>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+            <span className="text-orange-400 text-sm">Chờ Host chọn nhóm trình bày…</span>
+          </div>
+        </div>
+      )}
+
+      {/* Danh sách nhóm */}
+      {groups.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide">Các nhóm</p>
+          <div className="grid grid-cols-2 gap-2">
+            {groups.map((g) => (
+              <div key={g.id}
+                className={`rounded-xl px-3 py-2.5 text-sm font-bold text-center transition-all ${g.id === activeGroup ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30" : "bg-white/5 border border-white/10 text-gray-400"}`}>
+                {g.name}
+                {g.id === activeGroup && <span className="block text-xs font-normal opacity-80">🎤 Đang present</span>}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -393,23 +529,62 @@ function StageKetQua({ userId }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function EmployeePage() {
-  const [userId, setUserId] = useState(null); const [userName, setUserName] = useState(null); const [stage, setStage] = useState(0); const [sessionData, setSessionData] = useState(null);
-  useEffect(() => { setUserId(getUserId()); const n = typeof window !== "undefined" ? localStorage.getItem("oppo_name") : null; if (n) setUserName(n); }, []);
-  useEffect(() => { const u = onValue(ref(db, "session"), (snap) => { if (!snap.exists()) return; const d = snap.val(); setStage(d.stage ?? 0); setSessionData(d); }); return () => u(); }, []);
+  const [userId, setUserId] = useState(null);
+  const [userName, setUserName] = useState(null);
+  const [stage, setStage] = useState(0);
+  const [sessionData, setSessionData] = useState(null);
+
+  useEffect(() => {
+    setUserId(getUserId());
+    const n = typeof window !== "undefined" ? localStorage.getItem("oppo_name") : null;
+    if (n) setUserName(n);
+  }, []);
+
+  useEffect(() => {
+    const u = onValue(ref(db, "session"), (snap) => {
+      if (!snap.exists()) return;
+      const d = snap.val();
+      setStage(d.stage ?? 0);
+      setSessionData(d);
+    });
+    return () => u();
+  }, []);
+
+  // Reset card reveal state khi stage thay đổi khỏi stage 4
+  useEffect(() => {
+    if (stage !== 4 && typeof window !== "undefined") {
+      localStorage.removeItem("s4_cards_revealed");
+    }
+  }, [stage]);
+
   async function handleJoin(name, dept) {
     const uid = getUserId(); setUserName(name); localStorage.setItem("oppo_name", name);
     await set(ref(db, `users/${uid}`), { name, dept, joinedAt: Date.now() });
     await set(ref(db, `scores/${uid}/name`), name);
   }
+
   if (!userId) return null;
   if (!userName) return <StageLogin onJoin={handleJoin} />;
-  if (stage === 0) return <StageWaiting userName={userName} />;
-  if (stage === 1) return <StageIceBreaking userId={userId} />;
-  if (stage === 2) return <StageBietDeHieu userId={userId} userName={userName} sessionData={sessionData} />;
-  if (stage === 3) return <StageGiaiMaHanhVi userId={userId} userName={userName} sessionData={sessionData} />;
-  if (stage === 4) return <StageThaoLuanNhom userId={userId} sessionData={sessionData} />;
-  if (stage === 5) return <StageDNASharing userId={userId} />;
-  if (stage === 6) return <StageKeywords userId={userId} userName={userName} />;
-  if (stage === 7) return <StageKetQua userId={userId} />;
-  return null;
+
+  const renderStage = () => {
+    if (stage === 0) return <StageWaiting userName={userName} />;
+    if (stage === 1) return <StageIceBreaking userId={userId} />;
+    if (stage === 2) return <StageBietDeHieu userId={userId} userName={userName} sessionData={sessionData} />;
+    if (stage === 3) return <StageGiaiMaHanhVi userId={userId} userName={userName} sessionData={sessionData} />;
+    if (stage === 4) return <StageThaoLuanNhom userId={userId} sessionData={sessionData} />;
+    if (stage === 5) return <StageDNASharing userId={userId} />;
+    if (stage === 6) return <StageKeywords userId={userId} userName={userName} />;
+    if (stage === 7) return <StageKetQua userId={userId} />;
+    return null;
+  };
+
+  return (
+    <>
+      <Head><title>OPPO Culture Workshop</title></Head>
+      {/* FIX 2: Chuyển cảnh mượt */}
+      <StageTransition stage={stage}>
+        {renderStage()}
+      </StageTransition>
+    </>
+  );
 }
