@@ -1,7 +1,7 @@
-// pages/host.js — Màn hình Máy chiếu (v4 - bigger layout + mascot)
+// pages/host.js — Màn hình Máy chiếu (7 stages)
 import { useEffect, useState, useRef } from "react";
 import { db } from "../firebase";
-import { ref, onValue, set } from "firebase/database";
+import { ref, onValue, set, remove } from "firebase/database";
 import Head from "next/head";
 import { CULTURE_VALUES } from "../data/cultureValues";
 import QRCode from "qrcode";
@@ -9,8 +9,7 @@ import QRCode from "qrcode";
 function FloatingHeart({ id, x, onDone }) {
   const emojis = ["❤️", "💚", "🩷", "💛", "🧡"];
   const emoji = emojis[id % emojis.length];
-  const size = 40 + (id % 3) * 18;
-  const dur = 2.5 + (id % 4) * 0.5;
+  const size = 40 + (id % 3) * 18; const dur = 2.5 + (id % 4) * 0.5;
   useEffect(() => { const t = setTimeout(onDone, dur * 1000); return () => clearTimeout(t); }, []);
   return <span className="absolute bottom-0 pointer-events-none select-none" style={{ left: `${x}%`, fontSize: size, animation: `floatUp ${dur}s ease-out forwards` }}>{emoji}</span>;
 }
@@ -19,87 +18,78 @@ function JoinPopup({ name, dept, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 3000); return () => clearTimeout(t); }, []);
   return (
     <div className="animate-slideIn flex items-center gap-4 bg-emerald-500/20 border border-emerald-500/40 rounded-2xl px-6 py-4 shadow-xl">
-      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center text-white font-black text-xl flex-shrink-0">{name.charAt(0).toUpperCase()}</div>
+      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center text-white font-black text-xl">{name.charAt(0).toUpperCase()}</div>
       <div><p className="text-white font-bold text-lg">{name}</p>{dept && <p className="text-emerald-400 text-sm">{dept}</p>}</div>
-      <span className="text-emerald-400 text-base ml-2">đã tham gia ✓</span>
+      <span className="text-emerald-400 ml-2">đã tham gia ✓</span>
     </div>
   );
 }
 
-// Stage 0: Welcome + QR + mascot
+// ── Floating keyword component ─────────────────────────────────────────────────
+function FloatingKeyword({ word, x, y, size, delay, speed }) {
+  return (
+    <span className="absolute font-black select-none pointer-events-none"
+      style={{
+        left: `${x}%`, top: `${y}%`, fontSize: size,
+        color: `hsl(${150 + Math.random() * 30}, 80%, ${50 + Math.random() * 20}%)`,
+        animation: `floatKeyword ${speed}s ease-in-out ${delay}s infinite alternate`,
+        textShadow: "0 0 20px rgba(16,185,129,0.4)",
+        filter: "drop-shadow(0 0 8px rgba(16,185,129,0.3))",
+      }}>{word}</span>
+  );
+}
+
+// Stage 0: Welcome
 function HostWelcome({ url, users, onStart }) {
   const [qr, setQr] = useState("");
   const [popups, setPopups] = useState([]);
-  const prevCount = useRef(0);
-  const popupId = useRef(0);
-
+  const prevCount = useRef(0); const popupId = useRef(0);
   useEffect(() => {
     if (!url) return;
     QRCode.toDataURL(url, { width: 360, margin: 2, color: { dark: "#ffffff", light: "#00000000" } }).then(setQr).catch(console.error);
   }, [url]);
-
   useEffect(() => {
     if (users.length > prevCount.current) {
-      users.slice(prevCount.current).forEach((u) => {
-        const id = popupId.current++;
-        setPopups((p) => [...p, { id, name: u.name, dept: u.dept }]);
-      });
+      users.slice(prevCount.current).forEach((u) => { const id = popupId.current++; setPopups((p) => [...p, { id, name: u.name, dept: u.dept }]); });
     }
     prevCount.current = users.length;
   }, [users]);
-
   return (
     <div className="flex h-full">
-      {/* Left: Logo + Mascot + QR + Start */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8">
-        {/* Mascot thay cho 🟢 */}
-        <img src="/mascot.png" alt="OPPO Mascot" className="w-48 h-48 object-contain drop-shadow-2xl" />
-
+        <img src="/mascot.png" alt="OPPO Mascot" className="w-52 h-52 object-contain drop-shadow-2xl" onError={(e) => { e.target.style.display = "none"; }} />
         <div className="text-center">
           <h1 className="text-9xl font-black text-white tracking-tight leading-none">OPPO</h1>
           <h2 className="text-6xl font-black text-emerald-400 tracking-wider mt-2">CULTURE WORKSHOP</h2>
         </div>
-
         {qr && (
           <div className="flex flex-col items-center gap-4">
-            <div className="bg-white/10 border border-white/20 rounded-3xl p-6">
-              <img src={qr} alt="QR" className="w-64 h-64" />
-            </div>
+            <div className="bg-white/10 border border-white/20 rounded-3xl p-6"><img src={qr} alt="QR" className="w-64 h-64" /></div>
             <p className="text-gray-300 text-2xl">Quét QR để tham gia</p>
             <p className="text-emerald-400 font-mono text-lg">{url}</p>
           </div>
         )}
-
         <button onClick={onStart} disabled={users.length === 0}
-          className="px-20 py-6 rounded-3xl bg-gradient-to-r from-emerald-500 to-green-400 text-white font-black text-3xl
-            hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-emerald-500/40
-            disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100">
+          className="px-20 py-6 rounded-3xl bg-gradient-to-r from-emerald-500 to-green-400 text-white font-black text-3xl hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-emerald-500/40 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100">
           {users.length === 0 ? "Chờ người tham gia…" : `🚀 Bắt đầu (${users.length} người)`}
         </button>
       </div>
-
-      {/* Right: Danh sách */}
       <div className="w-96 flex flex-col border-l border-white/10 p-8 gap-5">
         <div className="flex items-center gap-3">
           <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
-          <p className="text-emerald-400 font-bold text-lg tracking-widest uppercase">Người tham gia</p>
+          <p className="text-emerald-400 font-bold text-lg uppercase tracking-widest">Người tham gia</p>
           <span className="ml-auto bg-emerald-500/20 text-emerald-400 font-black text-xl px-4 py-1.5 rounded-full">{users.length}</span>
         </div>
         <div className="flex-1 overflow-y-auto space-y-3">
           {users.length === 0 && <p className="text-gray-600 text-lg text-center mt-8">Chưa có ai…</p>}
           {users.map((u) => (
             <div key={u.uid} className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center text-white font-black text-base">{u.name?.charAt(0).toUpperCase()}</div>
-              <div className="min-w-0">
-                <p className="text-white text-base font-semibold truncate">{u.name}</p>
-                {u.dept && <p className="text-gray-500 text-sm truncate">{u.dept}</p>}
-              </div>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center text-white font-black">{u.name?.charAt(0).toUpperCase()}</div>
+              <div className="min-w-0"><p className="text-white text-base font-semibold truncate">{u.name}</p>{u.dept && <p className="text-gray-500 text-sm truncate">{u.dept}</p>}</div>
             </div>
           ))}
         </div>
       </div>
-
-      {/* Popups */}
       <div className="fixed top-8 right-8 flex flex-col gap-4 z-50 pointer-events-none" style={{ maxWidth: 380 }}>
         {popups.map((p) => <JoinPopup key={p.id} name={p.name} dept={p.dept} onDone={() => setPopups((x) => x.filter((i) => i.id !== p.id))} />)}
       </div>
@@ -111,20 +101,14 @@ function HostWelcome({ url, users, onStart }) {
 function HostIceBreaking({ totalHearts, users }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-10">
-      <div className="text-center">
-        <div className="inline-flex items-center gap-4 bg-rose-500/10 border border-rose-500/30 rounded-full px-8 py-3 mb-8">
-          <span className="w-4 h-4 rounded-full bg-rose-400 animate-pulse" />
-          <span className="text-rose-400 text-3xl font-black tracking-widest">STAGE 1 — ICE BREAKING</span>
-        </div>
-        <h1 className="text-8xl font-black text-white leading-tight">WELCOME TO</h1>
-        <h2 className="text-7xl font-black text-emerald-400 mt-2">OPPO CULTURE WORKSHOP</h2>
+      <div className="inline-flex items-center gap-4 bg-rose-500/10 border border-rose-500/30 rounded-full px-8 py-3">
+        <span className="w-4 h-4 rounded-full bg-rose-400 animate-pulse" />
+        <span className="text-rose-400 text-3xl font-black tracking-widest">STAGE 1 — ICE BREAKING</span>
       </div>
-      <p className="text-[12rem] font-black text-rose-400 leading-none">{totalHearts}</p>
-      <p className="text-4xl text-gray-400">❤️ tim đã gửi</p>
-      <div className="flex flex-wrap justify-center gap-4 max-w-5xl px-8 mt-4">
-        {users.map((u) => (
-          <span key={u.uid} className="bg-white/10 border border-white/20 rounded-full px-6 py-2 text-white text-xl">{u.name}</span>
-        ))}
+      <h1 className="text-8xl font-black text-white leading-tight text-center">WELCOME TO<br /><span className="text-emerald-400">OPPO CULTURE WORKSHOP</span></h1>
+      <p className="text-[10rem] font-black text-rose-400 leading-none">{totalHearts} ❤️</p>
+      <div className="flex flex-wrap justify-center gap-4 max-w-5xl px-8">
+        {users.map((u) => <span key={u.uid} className="bg-white/10 border border-white/20 rounded-full px-6 py-2 text-white text-xl">{u.name}</span>)}
       </div>
     </div>
   );
@@ -139,84 +123,48 @@ function HostBietDeHieu({ sessionData, s2answers, onShowAnswer, onNext }) {
   const [timeLeft, setTimeLeft] = useState(30);
   const timerRef = useRef(null);
   const q = questions[currentQ];
-
   useEffect(() => {
-    setTimeLeft(30);
-    clearInterval(timerRef.current);
+    setTimeLeft(30); clearInterval(timerRef.current);
     if (!q || gameEnded) return;
     timerRef.current = setInterval(() => setTimeLeft((t) => { if (t <= 1) { clearInterval(timerRef.current); return 0; } return t - 1; }), 1000);
     return () => clearInterval(timerRef.current);
   }, [currentQ, gameEnded]);
-
   const answered = Object.values(s2answers).filter((a) => a.userId).length;
 
-  if (gameEnded) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-12 px-16">
-        <div className="text-center">
-          <div className="inline-flex items-center gap-4 bg-blue-500/10 border border-blue-500/30 rounded-full px-8 py-3 mb-8">
-            <span className="text-blue-400 text-2xl font-bold">BIẾT ĐỂ HIỂU — KẾT THÚC</span>
-          </div>
-          <h2 className="text-6xl font-black text-white mb-3">4 Giá Trị Văn Hóa OPPO</h2>
-          <p className="text-gray-400 text-2xl">Speaker diễn giải thêm về từng giá trị</p>
-        </div>
-        <div className="grid grid-cols-2 gap-8 w-full max-w-6xl">
-          {CULTURE_VALUES.map((val) => (
-            <div key={val.id} className={`bg-gradient-to-br ${val.color} rounded-3xl p-10`}>
-              <div className="text-6xl mb-4">{val.icon}</div>
-              <h3 className="text-white font-black text-4xl mb-5">{val.title}</h3>
-              <div className="space-y-3">
-                {val.behaviors.map((b, i) => <p key={i} className="text-white/80 text-lg leading-relaxed">• {b}</p>)}
-              </div>
-            </div>
-          ))}
-        </div>
+  if (gameEnded) return (
+    <div className="flex flex-col items-center justify-center h-full gap-12 px-16">
+      <div className="text-center">
+        <h2 className="text-6xl font-black text-white mb-3">4 Giá Trị Văn Hóa OPPO</h2>
+        <p className="text-gray-400 text-2xl">Speaker diễn giải thêm về từng giá trị</p>
       </div>
-    );
-  }
-
+      <div className="grid grid-cols-2 gap-8 w-full max-w-6xl">
+        {CULTURE_VALUES.map((val) => (
+          <div key={val.id} className={`bg-gradient-to-br ${val.color} rounded-3xl p-10`}>
+            <div className="text-6xl mb-4">{val.icon}</div>
+            <h3 className="text-white font-black text-4xl mb-5">{val.title}</h3>
+            <div className="space-y-3">{val.behaviors.map((b, i) => <p key={i} className="text-white/80 text-lg">• {b}</p>)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
   if (!q) return <div className="flex items-center justify-center h-full"><p className="text-gray-400 text-3xl">Thêm câu hỏi Stage 2 trong Admin.</p></div>;
-
   return (
     <div className="flex flex-col h-full p-12 gap-8">
       <div className="flex items-center justify-between">
-        <div className="inline-flex items-center gap-4 bg-blue-500/10 border border-blue-500/30 rounded-full px-8 py-3">
-          <span className="w-4 h-4 rounded-full bg-blue-400 animate-pulse" />
-          <span className="text-blue-400 text-2xl font-bold">STAGE 2 — BIẾT ĐỂ HIỂU</span>
-        </div>
-        <div className="flex items-center gap-6">
-          <span className="text-gray-400 text-2xl">Câu {currentQ + 1}/{questions.length}</span>
-          <div className={`font-black text-5xl ${timeLeft <= 10 ? "text-red-400 animate-pulse" : "text-white"}`}>{timeLeft}s</div>
-        </div>
+        <div className="inline-flex items-center gap-4 bg-blue-500/10 border border-blue-500/30 rounded-full px-8 py-3"><span className="w-4 h-4 rounded-full bg-blue-400 animate-pulse" /><span className="text-blue-400 text-2xl font-bold">STAGE 2 — BIẾT ĐỂ HIỂU</span></div>
+        <div className="flex items-center gap-6"><span className="text-gray-400 text-2xl">Câu {currentQ + 1}/{questions.length}</span><div className={`font-black text-5xl ${timeLeft <= 10 ? "text-red-400 animate-pulse" : "text-white"}`}>{timeLeft}s</div></div>
       </div>
-
-      <div className="h-4 bg-white/10 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-1000 ${timeLeft > 10 ? "bg-blue-500" : "bg-red-500"}`} style={{ width: `${(timeLeft / 30) * 100}%` }} />
-      </div>
-
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-12 flex-1 flex items-center justify-center">
-        <p className="text-white text-5xl font-bold leading-relaxed text-center">{q.question}</p>
-      </div>
-
-      {showAns && (
-        <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-3xl px-10 py-6 text-center">
-          <p className="text-emerald-400 font-black text-4xl">✓ Đáp án: {q.answer}</p>
-        </div>
-      )}
-
+      <div className="h-4 bg-white/10 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all duration-1000 ${timeLeft > 10 ? "bg-blue-500" : "bg-red-500"}`} style={{ width: `${(timeLeft / 30) * 100}%` }} /></div>
+      <div className="bg-white/5 border border-white/10 rounded-3xl p-12 flex-1 flex items-center justify-center"><p className="text-white text-5xl font-bold leading-relaxed text-center">{q.question}</p></div>
+      {showAns && <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-3xl px-10 py-6 text-center"><p className="text-emerald-400 font-black text-4xl">✓ Đáp án: {q.answer}</p></div>}
       <div className="flex items-center justify-between">
         <span className="text-gray-500 text-2xl">{answered} người đã trả lời</span>
-        <div className="flex gap-4">
-          {!showAns ? (
-            <button onClick={onShowAnswer} className="px-12 py-5 rounded-2xl bg-yellow-500 text-black font-black text-2xl hover:bg-yellow-400 active:scale-95 transition-all shadow-xl">
-              📢 Hiện đáp án
-            </button>
-          ) : (
-            <button onClick={onNext} className="px-12 py-5 rounded-2xl bg-emerald-500 text-white font-black text-2xl hover:bg-emerald-400 active:scale-95 transition-all shadow-xl">
-              {currentQ < questions.length - 1 ? "Câu tiếp →" : "Kết thúc ✓"}
-            </button>
-          )}
-        </div>
+        {!showAns ? (
+          <button onClick={onShowAnswer} className="px-12 py-5 rounded-2xl bg-yellow-500 text-black font-black text-2xl hover:bg-yellow-400 active:scale-95 transition-all">📢 Hiện đáp án</button>
+        ) : (
+          <button onClick={onNext} className="px-12 py-5 rounded-2xl bg-emerald-500 text-white font-black text-2xl hover:bg-emerald-400 active:scale-95 transition-all">{currentQ < questions.length - 1 ? "Câu tiếp →" : "Kết thúc ✓"}</button>
+        )}
       </div>
     </div>
   );
@@ -226,123 +174,181 @@ function HostBietDeHieu({ sessionData, s2answers, onShowAnswer, onNext }) {
 function HostGiaiMaHanhVi({ sessionData, s3answers, users, onEndGame }) {
   const gameEnded = sessionData?.s3ended || false;
   const gameStartTime = sessionData?.s3startTime || null;
-  const TOTAL_TIME = 10 * 60;
+  const TOTAL_TIME = 600;
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
   const questions = sessionData?.s3questions || [];
-
   useEffect(() => {
     if (!gameStartTime || gameEnded) return;
     const tick = () => { const e = Math.floor((Date.now() - gameStartTime) / 1000); setTimeLeft(Math.max(0, TOTAL_TIME - e)); };
-    tick();
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
+    tick(); const t = setInterval(tick, 1000); return () => clearInterval(t);
   }, [gameStartTime, gameEnded]);
-
   const submitted = Object.keys(s3answers).length;
   const total = users.length;
-  const mins = Math.floor(timeLeft / 60);
-  const secs = timeLeft % 60;
+  const mins = Math.floor(timeLeft / 60); const secs = timeLeft % 60;
   const leaderboard = Object.values(s3answers).sort((a, b) => a.elapsed - b.elapsed).slice(0, 5);
-
   return (
     <div className="flex h-full p-12 gap-10">
       <div className="flex-1 flex flex-col gap-8">
         <div className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-4 bg-purple-500/10 border border-purple-500/30 rounded-full px-8 py-3">
-            <span className="w-4 h-4 rounded-full bg-purple-400 animate-pulse" />
-            <span className="text-purple-400 text-2xl font-bold">STAGE 3 — GIẢI MÃ HÀNH VI</span>
-          </div>
-          <div className={`font-black text-7xl ${timeLeft < 60 ? "text-red-400 animate-pulse" : "text-white"}`}>
-            ⏱ {mins}:{secs.toString().padStart(2, "0")}
-          </div>
+          <div className="inline-flex items-center gap-4 bg-purple-500/10 border border-purple-500/30 rounded-full px-8 py-3"><span className="w-4 h-4 rounded-full bg-purple-400 animate-pulse" /><span className="text-purple-400 text-2xl font-bold">STAGE 3 — GIẢI MÃ HÀNH VI</span></div>
+          <div className={`font-black text-7xl ${timeLeft < 60 ? "text-red-400 animate-pulse" : "text-white"}`}>⏱ {mins}:{secs.toString().padStart(2, "0")}</div>
         </div>
-
         <div className="flex-1 flex flex-col items-center justify-center gap-8">
           <p className="text-[10rem] font-black text-white leading-none">{submitted}</p>
           <p className="text-4xl text-gray-400">/ {total} đã nộp bài</p>
-          <div className="w-full max-w-2xl h-6 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-purple-500 to-violet-400 rounded-full transition-all duration-500" style={{ width: `${total > 0 ? (submitted / total) * 100 : 0}%` }} />
-          </div>
+          <div className="w-full max-w-2xl h-6 bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-purple-500 to-violet-400 rounded-full transition-all duration-500" style={{ width: `${total > 0 ? (submitted / total) * 100 : 0}%` }} /></div>
           <p className="text-gray-500 text-2xl">{questions.length} câu • Đúng +20đ • Hoàn thành sớm +50đ</p>
         </div>
-
-        {!gameEnded ? (
-          <div className="text-center">
-            <button onClick={onEndGame} className="px-16 py-6 rounded-3xl bg-purple-600 text-white font-black text-3xl hover:bg-purple-500 active:scale-95 transition-all shadow-xl">
-              Kết thúc Game ✓
-            </button>
-          </div>
-        ) : <p className="text-center text-emerald-400 font-black text-3xl">✅ Game đã kết thúc</p>}
+        {!gameEnded ? <div className="text-center"><button onClick={onEndGame} className="px-16 py-6 rounded-3xl bg-purple-600 text-white font-black text-3xl hover:bg-purple-500 active:scale-95 transition-all">Kết thúc ✓</button></div>
+          : <p className="text-center text-emerald-400 font-black text-3xl">✅ Đã kết thúc</p>}
       </div>
-
       <div className="w-80 flex flex-col border-l border-white/10 pl-10 gap-5">
-        <p className="text-white font-black text-2xl">🏃 Nộp bài sớm nhất</p>
-        {leaderboard.length === 0 && <p className="text-gray-600 text-lg">Chưa có ai nộp…</p>}
-        {leaderboard.map((s, i) => {
-          const m = Math.floor(s.elapsed / 60); const sc = s.elapsed % 60;
-          return (
-            <div key={s.userId} className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl px-5 py-4">
-              <span className="text-yellow-400 font-black text-2xl">#{i + 1}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-lg font-semibold truncate">{s.userName}</p>
-                <p className="text-gray-500 text-sm">{m}:{sc.toString().padStart(2, "0")} • +{s.bonus}đ thưởng</p>
-              </div>
-            </div>
-          );
-        })}
+        <p className="text-white font-black text-2xl">🏃 Nộp sớm nhất</p>
+        {leaderboard.length === 0 && <p className="text-gray-600 text-lg">Chưa có ai…</p>}
+        {leaderboard.map((s, i) => { const m = Math.floor(s.elapsed / 60); const sc = s.elapsed % 60; return (
+          <div key={s.userId} className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl px-5 py-4">
+            <span className="text-yellow-400 font-black text-2xl">#{i + 1}</span>
+            <div className="flex-1"><p className="text-white text-lg font-semibold truncate">{s.userName}</p><p className="text-gray-500 text-sm">{m}:{sc.toString().padStart(2, "0")} • +{s.bonus}đ</p></div>
+          </div>
+        ); })}
       </div>
     </div>
   );
 }
 
-// Stage 4: DNA Sharing
+// Stage 4: Thảo Luận Nhóm
+function HostThaoLuanNhom({ sessionData, groupHearts, totalGroupHearts }) {
+  const groups = sessionData?.groups || [];
+  const activeGroup = sessionData?.activeGroup || null;
+  const activeGroupData = groups.find((g) => g.id === activeGroup);
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-10">
+      <div className="inline-flex items-center gap-4 bg-orange-500/10 border border-orange-500/30 rounded-full px-8 py-3">
+        <span className="w-4 h-4 rounded-full bg-orange-400 animate-pulse" />
+        <span className="text-orange-400 text-3xl font-black tracking-widest">STAGE 4 — THẢO LUẬN NHÓM</span>
+      </div>
+      {activeGroupData ? (
+        <div className="text-center">
+          <p className="text-gray-400 text-2xl mb-3">Đang trình bày:</p>
+          <h2 className="text-8xl font-black text-white">{activeGroupData.name}</h2>
+          <p className="text-gray-400 text-2xl mt-2">{(activeGroupData.members || []).length} thành viên</p>
+          <p className="text-[8rem] font-black text-rose-400 mt-6">{totalGroupHearts} ❤️</p>
+          <p className="text-gray-400 text-2xl">tim ủng hộ</p>
+        </div>
+      ) : (
+        <div className="text-center">
+          <p className="text-6xl font-black text-gray-600 mb-4">Chọn nhóm trình bày</p>
+          <p className="text-gray-500 text-2xl">Admin → chọn nhóm đang present</p>
+        </div>
+      )}
+      <div className="flex flex-wrap justify-center gap-4 max-w-4xl">
+        {groups.map((g) => (
+          <div key={g.id} className={`px-8 py-4 rounded-2xl text-xl font-bold transition-all ${g.id === activeGroup ? "bg-orange-500 text-white shadow-lg shadow-orange-500/40 scale-110" : "bg-white/10 text-gray-400"}`}>
+            {g.name}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Stage 5: DNA Sharing
 function HostDNASharing({ totalHearts }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-10">
-      <div className="text-center">
-        <div className="inline-flex items-center gap-4 bg-purple-500/10 border border-purple-500/30 rounded-full px-8 py-3 mb-8">
-          <span className="w-4 h-4 rounded-full bg-purple-400 animate-pulse" />
-          <span className="text-purple-400 text-3xl font-black tracking-widest">STAGE 4 — DNA SHARING</span>
-        </div>
-        <h2 className="text-8xl font-black text-white">Màn chia sẻ 💬</h2>
-        <p className="text-gray-400 text-3xl mt-4">Lắng nghe những câu chuyện thực tế</p>
+      <div className="inline-flex items-center gap-4 bg-purple-500/10 border border-purple-500/30 rounded-full px-8 py-3">
+        <span className="w-4 h-4 rounded-full bg-purple-400 animate-pulse" />
+        <span className="text-purple-400 text-3xl font-black tracking-widest">STAGE 5 — DNA SHARING</span>
       </div>
-      <p className="text-[12rem] font-black text-rose-400 leading-none">❤️</p>
-      <p className="text-[8rem] font-black text-white leading-none">{totalHearts}</p>
-      <p className="text-4xl text-gray-400">tim ủng hộ</p>
+      <h2 className="text-8xl font-black text-white">Màn chia sẻ 💬</h2>
+      <p className="text-gray-400 text-3xl">Lắng nghe những câu chuyện thực tế</p>
+      <p className="text-[10rem] font-black text-rose-400 leading-none">{totalHearts} ❤️</p>
     </div>
   );
 }
 
-// Stage 5: Kết quả
+// Stage 6: Keywords word cloud
+function HostKeywords({ keywords }) {
+  const allWords = keywords.flatMap((k) => k.words || []);
+  const [floaters, setFloaters] = useState([]);
+
+  useEffect(() => {
+    const placed = allWords.map((word, i) => ({
+      word, id: i,
+      x: 5 + Math.random() * 85,
+      y: 5 + Math.random() * 80,
+      size: 28 + Math.random() * 36,
+      delay: Math.random() * 3,
+      speed: 3 + Math.random() * 4,
+    }));
+    setFloaters(placed);
+  }, [keywords.length]);
+
+  return (
+    <div className="relative h-full w-full overflow-hidden" style={{ background: "linear-gradient(135deg, #ffffff 0%, #ecfdf5 40%, #d1fae5 100%)" }}>
+      <style>{`
+        @keyframes floatKeyword {
+          0% { transform: translateY(0px) rotate(-2deg); }
+          100% { transform: translateY(-18px) rotate(2deg); }
+        }
+      `}</style>
+      {/* Header */}
+      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 text-center">
+        <div className="inline-flex items-center gap-3 bg-emerald-500/20 border border-emerald-500/40 rounded-full px-8 py-3 backdrop-blur-sm">
+          <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-emerald-700 text-2xl font-black tracking-widest">STAGE 6 — KEYWORDS</span>
+        </div>
+        <p className="text-emerald-600 text-xl mt-3 font-semibold">{allWords.length} keyword từ {keywords.length} người</p>
+      </div>
+
+      {/* Floating words */}
+      {floaters.map((f) => (
+        <FloatingKeyword key={f.id} word={f.word} x={f.x} y={f.y} size={f.size} delay={f.delay} speed={f.speed} />
+      ))}
+
+      {allWords.length === 0 && (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-emerald-400 text-3xl font-bold opacity-50">Chờ mọi người điền keyword…</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Stage 7: Kết quả → NOW YOU ARE OPPOER
 function HostKetQua({ scores }) {
   const [showEnd, setShowEnd] = useState(false);
-  if (showEnd) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-8 text-center">
-        <img src="/mascot.png" alt="mascot" className="w-64 h-64 object-contain drop-shadow-2xl" />
-        <h1 className="text-[10rem] font-black text-emerald-400 leading-none">CHÀO MỪNG</h1>
-        <h2 className="text-8xl font-black text-white">BẠN ĐẾN NHÀ O</h2>
-        <button onClick={() => setShowEnd(false)} className="mt-6 text-gray-600 text-lg underline">← Quay lại</button>
-      </div>
-    );
+  const [transitioning, setTransitioning] = useState(false);
+
+  function handleEnd() {
+    setTransitioning(true);
+    setTimeout(() => setShowEnd(true), 800);
   }
 
-  const top3 = scores.slice(0, 3);
-  const rest = scores.slice(3, 10);
+  if (showEnd) return (
+    <div className="flex flex-col items-center justify-center h-full gap-8 text-center" style={{ background: "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)" }}>
+      <img src="/mascot.png" alt="mascot" className="w-72 h-72 object-contain drop-shadow-2xl animate-bounce" onError={(e) => { e.target.style.display = "none"; }} />
+      <div>
+        <p className="text-emerald-300 text-3xl font-semibold tracking-widest mb-4">CHÀO MỪNG BẠN</p>
+        <h1 className="text-[8rem] font-black text-white leading-none tracking-tight">NOW YOU ARE</h1>
+        <h2 className="text-[9rem] font-black leading-none" style={{ color: "#34d399", textShadow: "0 0 60px rgba(52,211,153,0.6)" }}>OPPOER</h2>
+      </div>
+      <button onClick={() => setShowEnd(false)} className="mt-4 text-emerald-600 text-lg underline">← Quay lại</button>
+    </div>
+  );
+
+  const top3 = scores.slice(0, 3); const rest = scores.slice(3, 10);
   return (
-    <div className="flex flex-col h-full p-12 gap-8">
+    <div className={`flex flex-col h-full p-12 gap-8 transition-opacity duration-700 ${transitioning ? "opacity-0" : "opacity-100"}`}>
       <div className="text-center">
         <div className="inline-flex items-center gap-4 bg-yellow-500/10 border border-yellow-500/30 rounded-full px-8 py-3">
-          <span className="text-yellow-400 text-2xl font-bold tracking-widest">🏆 STAGE 5 — BẢNG XẾP HẠNG</span>
+          <span className="text-yellow-400 text-2xl font-bold tracking-widest">🏆 STAGE 7 — BẢNG XẾP HẠNG</span>
         </div>
       </div>
-
       <div className="flex justify-center items-end gap-10">
         {[1, 0, 2].map((i) => {
           const s = top3[i]; if (!s) return null;
-          const medals = ["🥇", "🥈", "🥉"];
-          const heights = { 0: "h-52", 1: "h-36", 2: "h-32" };
+          const medals = ["🥇", "🥈", "🥉"]; const heights = { 0: "h-52", 1: "h-36", 2: "h-32" };
           return (
             <div key={s.uid} className={`flex flex-col items-center gap-3 ${i === 0 ? "order-2" : i === 1 ? "order-1" : "order-3"}`}>
               <span className="text-6xl">{medals[i]}</span>
@@ -355,7 +361,6 @@ function HostKetQua({ scores }) {
           );
         })}
       </div>
-
       <div className="grid grid-cols-2 gap-4 flex-1">
         {rest.map((s, i) => (
           <div key={s.uid} className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl px-6 py-4">
@@ -365,10 +370,9 @@ function HostKetQua({ scores }) {
           </div>
         ))}
       </div>
-
       <div className="text-center">
-        <button onClick={() => setShowEnd(true)} className="px-20 py-6 rounded-3xl bg-gradient-to-r from-emerald-500 to-green-400 text-white font-black text-3xl hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-emerald-500/30">
-          🏠 Kết thúc chương trình
+        <button onClick={handleEnd} className="px-20 py-6 rounded-3xl bg-gradient-to-r from-emerald-500 to-green-400 text-white font-black text-3xl hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-emerald-500/30">
+          🏠 Kết thúc → NOW YOU ARE OPPOER
         </button>
       </div>
     </div>
@@ -381,13 +385,16 @@ export default function HostPage() {
   const [sessionData, setSessionData] = useState(null);
   const [hearts, setHearts] = useState([]);
   const [totalHearts, setTotalHearts] = useState(0);
+  const [groupHearts, setGroupHearts] = useState([]);
+  const [totalGroupHearts, setTotalGroupHearts] = useState(0);
   const [users, setUsers] = useState([]);
   const [s2answers, setS2answers] = useState({});
   const [s3answers, setS3answers] = useState({});
+  const [keywords, setKeywords] = useState([]);
   const [scores, setScores] = useState([]);
   const [siteUrl, setSiteUrl] = useState("");
-  const prevHearts = useRef(0);
-  const heartId = useRef(0);
+  const prevHearts = useRef(0); const heartId = useRef(0);
+  const prevGroupHearts = useRef(0); const groupHeartId = useRef(0);
 
   useEffect(() => { if (typeof window !== "undefined") setSiteUrl(window.location.origin); }, []);
 
@@ -400,17 +407,25 @@ export default function HostPage() {
       if (newC > 0) { const nh = Array.from({ length: Math.min(newC, 12) }, () => ({ id: heartId.current++, x: 5 + Math.random() * 90 })); setHearts((h) => [...h, ...nh]); }
       prevHearts.current = count;
     });
-    const u3 = onValue(ref(db, "users"), (snap) => { if (!snap.exists()) return setUsers([]); setUsers(Object.entries(snap.val()).map(([uid, v]) => ({ uid, ...v }))); });
-    const u4 = onValue(ref(db, "s2answers"), (snap) => setS2answers(snap.exists() ? snap.val() : {}));
-    const u5 = onValue(ref(db, "s3answers"), (snap) => setS3answers(snap.exists() ? snap.val() : {}));
-    const u6 = onValue(ref(db, "scores"), (snap) => {
+    const u3 = onValue(ref(db, "groupHearts"), (snap) => {
+      if (!snap.exists()) { prevGroupHearts.current = 0; setGroupHearts([]); setTotalGroupHearts(0); return; }
+      const count = Object.keys(snap.val()).length; setTotalGroupHearts(count);
+      const newC = count - prevGroupHearts.current;
+      if (newC > 0) { const nh = Array.from({ length: Math.min(newC, 12) }, () => ({ id: groupHeartId.current++, x: 5 + Math.random() * 90 })); setGroupHearts((h) => [...h, ...nh]); }
+      prevGroupHearts.current = count;
+    });
+    const u4 = onValue(ref(db, "users"), (snap) => { if (!snap.exists()) return setUsers([]); setUsers(Object.entries(snap.val()).map(([uid, v]) => ({ uid, ...v }))); });
+    const u5 = onValue(ref(db, "s2answers"), (snap) => setS2answers(snap.exists() ? snap.val() : {}));
+    const u6 = onValue(ref(db, "s3answers"), (snap) => setS3answers(snap.exists() ? snap.val() : {}));
+    const u7 = onValue(ref(db, "keywords"), (snap) => { if (!snap.exists()) return setKeywords([]); setKeywords(Object.values(snap.val())); });
+    const u8 = onValue(ref(db, "scores"), (snap) => {
       if (!snap.exists()) return setScores([]);
       const list = Object.entries(snap.val()).filter(([_, s]) => s.name)
-        .map(([uid, s]) => ({ uid, name: s.name, total: (s.s2 || 0) + (s.s3 || 0) + (s.hearts || 0) }))
+        .map(([uid, s]) => ({ uid, name: s.name, total: (s.s2 || 0) + (s.s3 || 0) + (s.hearts || 0) + (s.groupHearts || 0) }))
         .sort((a, b) => b.total - a.total);
       setScores(list);
     });
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
   }, []);
 
   useEffect(() => {
@@ -420,15 +435,18 @@ export default function HostPage() {
     if (allDone || elapsed >= 600) { set(ref(db, "session/s3ended"), true); }
   }, [s3answers, users, stage, sessionData]);
 
+  const allHearts = [...hearts, ...groupHearts];
+
   async function handleStart() { await set(ref(db, "session/stage"), 1); }
   async function handleS2ShowAnswer() { await set(ref(db, "session/s2showAnswer"), true); }
   async function handleS2Next() {
-    const cur = sessionData?.s2current ?? 0;
-    const qs = sessionData?.s2questions || [];
+    const cur = sessionData?.s2current ?? 0; const qs = sessionData?.s2questions || [];
     if (cur < qs.length - 1) { await set(ref(db, "session/s2current"), cur + 1); await set(ref(db, "session/s2showAnswer"), false); }
     else { await set(ref(db, "session/s2ended"), true); }
   }
   async function handleS3EndGame() { await set(ref(db, "session/s3ended"), true); }
+
+  const isKeywordStage = stage === 6;
 
   return (
     <>
@@ -440,17 +458,21 @@ export default function HostPage() {
           .animate-slideIn { animation: slideIn 0.4s cubic-bezier(.34,1.56,.64,1) forwards; }
         `}</style>
       </Head>
-      <div className="bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 relative overflow-hidden" style={{ height: "100vh", width: "100vw" }}>
-        <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden">
-          {hearts.map((h) => <FloatingHeart key={h.id} id={h.id} x={h.x} onDone={() => setHearts((x) => x.filter((i) => i.id !== h.id))} />)}
-        </div>
+      <div className={`relative overflow-hidden transition-colors duration-1000 ${isKeywordStage ? "" : "bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950"}`} style={{ height: "100vh", width: "100vw" }}>
+        {!isKeywordStage && (
+          <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden">
+            {allHearts.map((h) => <FloatingHeart key={h.id} id={h.id} x={h.x} onDone={() => { setHearts((x) => x.filter((i) => i.id !== h.id)); setGroupHearts((x) => x.filter((i) => i.id !== h.id)); }} />)}
+          </div>
+        )}
         <div className="h-full w-full">
           {stage === 0 && <HostWelcome url={siteUrl} users={users} onStart={handleStart} />}
           {stage === 1 && <HostIceBreaking totalHearts={totalHearts} users={users} />}
           {stage === 2 && <HostBietDeHieu sessionData={sessionData} s2answers={s2answers} onShowAnswer={handleS2ShowAnswer} onNext={handleS2Next} />}
           {stage === 3 && <HostGiaiMaHanhVi sessionData={sessionData} s3answers={s3answers} users={users} onEndGame={handleS3EndGame} />}
-          {stage === 4 && <HostDNASharing totalHearts={totalHearts} />}
-          {stage === 5 && <HostKetQua scores={scores} />}
+          {stage === 4 && <HostThaoLuanNhom sessionData={sessionData} groupHearts={groupHearts} totalGroupHearts={totalGroupHearts} />}
+          {stage === 5 && <HostDNASharing totalHearts={totalHearts} />}
+          {stage === 6 && <HostKeywords keywords={keywords} />}
+          {stage === 7 && <HostKetQua scores={scores} />}
         </div>
       </div>
     </>
