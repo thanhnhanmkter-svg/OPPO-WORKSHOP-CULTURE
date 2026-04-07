@@ -5,6 +5,7 @@ import { ref, set, push, onValue, get } from "firebase/database";
 import Head from "next/head";
 import { CULTURE_VALUES } from "../data/cultureValues";
 
+//test
 function getUserId() {
   if (typeof window === "undefined") return null;
   let id = localStorage.getItem("oppo_uid");
