@@ -4,15 +4,26 @@ import { db } from "../firebase";
 import { ref, set, onValue, remove } from "firebase/database";
 import Head from "next/head";
 
-const STAGES = [
-  { id: 0, label: "🏠 Màn hình chào / QR", color: "from-gray-600 to-gray-500" },
-  { id: 1, label: "🧊 Stage 1 — Ice Breaking", color: "from-rose-600 to-pink-500" },
-  { id: 2, label: "📝 Stage 2 — Biết Để Hiểu", color: "from-blue-600 to-indigo-500" },
-  { id: 3, label: "🧩 Stage 3 — Giải Mã Hành Vi", color: "from-purple-600 to-violet-500" },
-  { id: 4, label: "👥 Stage 4 — Thảo Luận Nhóm", color: "from-orange-600 to-amber-500" },
-  { id: 5, label: "💬 Stage 5 — DNA Sharing", color: "from-pink-600 to-rose-500" },
-  { id: 6, label: "💡 Stage 6 — Keywords", color: "from-cyan-600 to-teal-500" },
-  { id: 7, label: "🏆 Stage 7 — Kết Quả", color: "from-yellow-600 to-amber-500" },
+const DEFAULT_STAGE_CONFIG = [
+  { id: 0, label: "🏠 Stage 0", title: "CULTURE WORKSHOP", subtitle: "Quét QR để tham gia" },
+  { id: 1, label: "🧊 Stage 1", title: "ICE BREAKING", subtitle: "" },
+  { id: 2, label: "📝 Stage 2", title: "BIẾT ĐỂ HIỂU", subtitle: "" },
+  { id: 3, label: "🧩 Stage 3", title: "GIẢI MÃ HÀNH VI", subtitle: "" },
+  { id: 4, label: "👥 Stage 4", title: "THẢO LUẬN NHÓM", subtitle: "" },
+  { id: 5, label: "💬 Stage 5", title: "DNA SHARING", subtitle: "Lắng nghe những câu chuyện thực tế" },
+  { id: 6, label: "💡 Stage 6", title: "KEYWORDS", subtitle: "" },
+  { id: 7, label: "🏆 Stage 7", title: "BẢNG XẾP HẠNG", subtitle: "" },
+];
+
+const STAGE_COLORS = [
+  "from-gray-600 to-gray-500",
+  "from-rose-600 to-pink-500",
+  "from-blue-600 to-indigo-500",
+  "from-purple-600 to-violet-500",
+  "from-orange-600 to-amber-500",
+  "from-pink-600 to-rose-500",
+  "from-cyan-600 to-teal-500",
+  "from-yellow-600 to-amber-500",
 ];
 
 const EMPTY_Q2 = { question: "", answer: "" };
@@ -43,6 +54,12 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
 
+  // FIX 7: Stage config state
+  const [stageConfig, setStageConfig] = useState(DEFAULT_STAGE_CONFIG);
+  const [editingStage, setEditingStage] = useState(null);
+  const [editForm, setEditForm] = useState({ title: "", subtitle: "" });
+  const [savingConfig, setSavingConfig] = useState(false);
+
   useEffect(() => {
     const u1 = onValue(ref(db, "session"), (snap) => {
       if (!snap.exists()) return;
@@ -52,6 +69,10 @@ export default function AdminPage() {
       setS3questions(d.s3questions || []);
       setGroups(d.groups || []);
       setActiveGroupState(d.activeGroup ?? null);
+      // FIX 7: Load stage config từ Firebase
+      if (d.stageConfig) {
+        setStageConfig(d.stageConfig);
+      }
     });
     const u2 = onValue(ref(db, "users"), (snap) => {
       const list = snap.exists() ? Object.entries(snap.val()).map(([uid, v]) => ({ uid, ...v })) : [];
@@ -69,12 +90,37 @@ export default function AdminPage() {
     await set(ref(db, "session/stage"), s);
   }
 
-  async function resetAll() {
-    if (!confirm("⚠️ Xóa toàn bộ dữ liệu kể cả người tham gia?")) return;
+  // FIX 3: Reset chỉ xóa người tham gia & điểm số, GIỮ câu hỏi
+  async function resetParticipants() {
+    if (!confirm("⚠️ Reset người tham gia và điểm số? (Câu hỏi và nhóm sẽ được giữ lại)")) return;
     await Promise.all([
-      remove(ref(db, "s2answers")), remove(ref(db, "s3answers")),
-      remove(ref(db, "hearts")), remove(ref(db, "scores")),
-      remove(ref(db, "users")), remove(ref(db, "keywords")),
+      remove(ref(db, "s2answers")),
+      remove(ref(db, "s3answers")),
+      remove(ref(db, "hearts")),
+      remove(ref(db, "scores")),
+      remove(ref(db, "users")),
+      remove(ref(db, "keywords")),
+      remove(ref(db, "groupHearts")),
+      set(ref(db, "session/stage"), 0),
+      set(ref(db, "session/s2current"), 0),
+      set(ref(db, "session/s2showAnswer"), false),
+      set(ref(db, "session/s2ended"), false),
+      set(ref(db, "session/s3ended"), false),
+      set(ref(db, "session/s3startTime"), null),
+      set(ref(db, "session/activeGroup"), null),
+    ]);
+  }
+
+  // FIX 3: Reset TOÀN BỘ kể cả câu hỏi
+  async function resetAll() {
+    if (!confirm("⚠️ XÓA TOÀN BỘ kể cả câu hỏi và nhóm? Không thể hoàn tác!")) return;
+    await Promise.all([
+      remove(ref(db, "s2answers")),
+      remove(ref(db, "s3answers")),
+      remove(ref(db, "hearts")),
+      remove(ref(db, "scores")),
+      remove(ref(db, "users")),
+      remove(ref(db, "keywords")),
       remove(ref(db, "groupHearts")),
       set(ref(db, "session/stage"), 0),
       set(ref(db, "session/s2current"), 0),
@@ -84,6 +130,8 @@ export default function AdminPage() {
       set(ref(db, "session/s3startTime"), null),
       set(ref(db, "session/activeGroup"), null),
       set(ref(db, "session/groups"), []),
+      set(ref(db, "session/s2questions"), []),
+      set(ref(db, "session/s3questions"), []),
     ]);
   }
 
@@ -125,7 +173,6 @@ export default function AdminPage() {
   }
 
   async function endGroupPresent() {
-    // Đọc tim và chia đều
     const grp = groups.find((g) => g.id === activeGroup);
     if (grp && (grp.members || []).length > 0) {
       await new Promise((resolve) => {
@@ -175,12 +222,28 @@ export default function AdminPage() {
   async function shuffleS3() { const q = shuffle(s3questions); await set(ref(db, "session/s3questions"), q); }
   async function deleteS3(i) { if (!confirm("Xóa?")) return; await set(ref(db, "session/s3questions"), s3questions.filter((_, x) => x !== i)); }
 
+  // ── FIX 7: Stage config ──
+  function startEditStage(cfg) {
+    setEditingStage(cfg.id);
+    setEditForm({ title: cfg.title, subtitle: cfg.subtitle });
+  }
+
+  async function saveStageConfig() {
+    setSavingConfig(true);
+    const newConfig = stageConfig.map((c) => c.id === editingStage ? { ...c, ...editForm } : c);
+    await set(ref(db, "session/stageConfig"), newConfig);
+    setStageConfig(newConfig);
+    setEditingStage(null);
+    setSavingConfig(false);
+  }
+
   const ungrouped = users.filter((u) => !getUserGroup(u.uid));
 
   return (
     <>
       <Head><title>OPPO Workshop — Admin</title></Head>
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 flex flex-col">
+        {/* Header */}
         <div className="bg-black/30 border-b border-white/10 px-6 py-4 flex items-center justify-between">
           <div><h1 className="text-white font-black text-xl">🎛️ Admin</h1><p className="text-gray-500 text-xs">OPPO Culture Workshop</p></div>
           <div className="flex items-center gap-3 text-sm text-gray-400">
@@ -189,12 +252,14 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* Tabs */}
         <div className="flex border-b border-white/10 overflow-x-auto">
           {[
             { id: "control", label: "🎮 Điều khiển" },
             { id: "groups", label: `👥 Nhóm (${groups.length})` },
             { id: "s2", label: `📝 S2 (${s2questions.length})` },
             { id: "s3", label: `🧩 S3 (${s3questions.length})` },
+            { id: "config", label: "⚙️ Tên Stage" },
           ].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`flex-1 py-3 text-xs font-bold whitespace-nowrap px-2 transition-colors ${tab === t.id ? "text-emerald-400 border-b-2 border-emerald-400" : "text-gray-500"}`}>
@@ -205,16 +270,21 @@ export default function AdminPage() {
 
         <div className="flex-1 overflow-y-auto p-4">
 
+          {/* ── Tab Điều khiển ── */}
           {tab === "control" && (
             <div className="space-y-3 max-w-lg mx-auto">
               <h2 className="text-white font-black text-lg text-center mb-4">Chọn Stage</h2>
-              {STAGES.map((s) => (
-                <button key={s.id} onClick={() => changeStage(s.id)}
-                  className={`w-full py-4 rounded-2xl font-black text-base transition-all active:scale-95 bg-gradient-to-r ${s.color} text-white ${stage === s.id ? "ring-4 ring-white/40 scale-105" : "opacity-70 hover:opacity-100"}`}>
-                  {stage === s.id && "▶ "}{s.label}
-                </button>
-              ))}
+              {DEFAULT_STAGE_CONFIG.map((s) => {
+                const cfg = stageConfig.find((c) => c.id === s.id) || s;
+                return (
+                  <button key={s.id} onClick={() => changeStage(s.id)}
+                    className={`w-full py-4 rounded-2xl font-black text-base transition-all active:scale-95 bg-gradient-to-r ${STAGE_COLORS[s.id]} text-white ${stage === s.id ? "ring-4 ring-white/40 scale-105" : "opacity-70 hover:opacity-100"}`}>
+                    {stage === s.id && "▶ "}{s.label} — {cfg.title}
+                  </button>
+                );
+              })}
 
+              {/* Stage 4 nhóm present */}
               {stage === 4 && groups.length > 0 && (
                 <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 space-y-3 mt-2">
                   <p className="text-orange-400 font-black text-sm">👥 Nhóm đang trình bày:</p>
@@ -232,11 +302,16 @@ export default function AdminPage() {
                 </div>
               )}
 
-              <div className="pt-3 border-t border-white/10">
+              {/* FIX 3: 2 nút reset */}
+              <div className="pt-3 border-t border-white/10 space-y-2">
+                <button onClick={resetParticipants} className="w-full py-4 rounded-2xl bg-orange-900/40 border border-orange-700/40 text-orange-400 font-bold hover:bg-orange-900/60 active:scale-95">
+                  🔄 Reset người tham gia (giữ câu hỏi)
+                </button>
                 <button onClick={resetAll} className="w-full py-4 rounded-2xl bg-red-900/40 border border-red-700/40 text-red-400 font-bold hover:bg-red-900/60 active:scale-95">
-                  🔄 Reset toàn bộ (xóa cả người tham gia)
+                  💣 Reset toàn bộ (xóa cả câu hỏi)
                 </button>
               </div>
+
               <div className="flex gap-3">
                 <a href="/" target="_blank" className="flex-1 text-center py-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-sm">📱 Nhân viên</a>
                 <a href="/host" target="_blank" className="flex-1 text-center py-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-sm">🖥️ Host</a>
@@ -244,6 +319,7 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ── Tab Nhóm ── */}
           {tab === "groups" && (
             <div className="max-w-2xl mx-auto space-y-4">
               <h2 className="text-white font-black text-lg">👥 Chia nhóm</h2>
@@ -296,6 +372,7 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ── Tab S2 ── */}
           {tab === "s2" && (
             <div className="max-w-2xl mx-auto">
               {editingS2 !== null ? (
@@ -340,6 +417,7 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ── Tab S3 ── */}
           {tab === "s3" && (
             <div className="max-w-2xl mx-auto">
               {editingS3 !== null ? (
@@ -391,6 +469,77 @@ export default function AdminPage() {
               )}
             </div>
           )}
+
+          {/* ── FIX 7: Tab Config tên Stage ── */}
+          {tab === "config" && (
+            <div className="max-w-2xl mx-auto space-y-4">
+              <h2 className="text-white font-black text-lg">⚙️ Chỉnh tên & mô tả Stage</h2>
+              <p className="text-gray-500 text-sm">Thay đổi sẽ hiển thị ngay trên màn hình Host.</p>
+
+              {editingStage !== null ? (
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-white font-black">
+                      {DEFAULT_STAGE_CONFIG.find((s) => s.id === editingStage)?.label}
+                    </h3>
+                    <button onClick={() => setEditingStage(null)} className="text-gray-500 text-sm">✕ Hủy</button>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-gray-400 text-xs font-semibold uppercase mb-1 block">Tiêu đề chính</label>
+                      <input
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 font-bold"
+                        placeholder="Tiêu đề stage…"
+                        value={editForm.title}
+                        onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs font-semibold uppercase mb-1 block">Mô tả / Subtitle (tuỳ chọn)</label>
+                      <input
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                        placeholder="Mô tả ngắn (có thể để trống)…"
+                        value={editForm.subtitle}
+                        onChange={(e) => setEditForm((f) => ({ ...f, subtitle: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={saveStageConfig}
+                    disabled={savingConfig || !editForm.title.trim()}
+                    className="w-full py-3 rounded-xl bg-emerald-500 text-white font-black text-base disabled:opacity-50 active:scale-95"
+                  >
+                    {savingConfig ? "Đang lưu…" : "💾 Lưu thay đổi"}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {stageConfig.map((cfg, i) => (
+                    <div key={cfg.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${STAGE_COLORS[i]} flex items-center justify-center text-white font-black text-sm flex-shrink-0`}>
+                        {cfg.id}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm truncate">{cfg.title}</p>
+                        {cfg.subtitle ? (
+                          <p className="text-gray-500 text-xs truncate">{cfg.subtitle}</p>
+                        ) : (
+                          <p className="text-gray-700 text-xs italic">Không có subtitle</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => startEditStage(cfg)}
+                        className="px-3 py-1.5 rounded-lg bg-white/10 text-gray-300 text-xs hover:bg-white/20 flex-shrink-0"
+                      >
+                        ✏️ Sửa
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       </div>
     </>
