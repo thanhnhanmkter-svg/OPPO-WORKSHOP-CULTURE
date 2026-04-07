@@ -25,25 +25,72 @@ function JoinPopup({ name, dept, onDone }) {
   );
 }
 
-// ── Floating keyword component ─────────────────────────────────────────────────
+// ── FIX 6: Floating keyword với màu tốt hơn, tránh tràn lên header ────────────
 function FloatingKeyword({ word, x, y, size, delay, speed }) {
+  const colors = [
+    "#10b981", "#059669", "#047857",
+    "#0d9488", "#0891b2", "#0e7490",
+    "#16a34a", "#15803d",
+  ];
+  const color = colors[Math.floor(Math.random() * colors.length)];
   return (
-    <span className="absolute font-black select-none pointer-events-none"
+    <span
+      className="absolute font-black select-none pointer-events-none"
       style={{
-        left: `${x}%`, top: `${y}%`, fontSize: size,
-        color: `hsl(${150 + Math.random() * 30}, 80%, ${50 + Math.random() * 20}%)`,
+        left: `${x}%`,
+        top: `${y}%`,
+        fontSize: size,
+        color,
         animation: `floatKeyword ${speed}s ease-in-out ${delay}s infinite alternate`,
-        textShadow: "0 0 20px rgba(16,185,129,0.4)",
-        filter: "drop-shadow(0 0 8px rgba(16,185,129,0.3))",
-      }}>{word}</span>
+        textShadow: `0 0 30px ${color}99, 0 2px 8px rgba(0,0,0,0.8)`,
+        WebkitTextStroke: "0.5px rgba(255,255,255,0.15)",
+        filter: `drop-shadow(0 0 12px ${color}88)`,
+      }}
+    >{word}</span>
+  );
+}
+
+// ── Stage Transition Wrapper ──────────────────────────────────────────────────
+function StageTransition({ stage, children }) {
+  const [visible, setVisible] = useState(true);
+  const [content, setContent] = useState(children);
+  const prevStage = useRef(stage);
+
+  useEffect(() => {
+    if (prevStage.current !== stage) {
+      setVisible(false);
+      const t = setTimeout(() => {
+        setContent(children);
+        prevStage.current = stage;
+        setVisible(true);
+      }, 400);
+      return () => clearTimeout(t);
+    } else {
+      setContent(children);
+    }
+  }, [stage, children]);
+
+  return (
+    <div style={{
+      opacity: visible ? 1 : 0,
+      transform: visible ? "translateY(0)" : "translateY(12px)",
+      transition: "opacity 0.4s ease, transform 0.4s ease",
+      height: "100%", width: "100%",
+    }}>
+      {content}
+    </div>
   );
 }
 
 // Stage 0: Welcome
-function HostWelcome({ url, users, onStart }) {
+function HostWelcome({ url, users, onStart, sessionData }) {
   const [qr, setQr] = useState("");
   const [popups, setPopups] = useState([]);
   const prevCount = useRef(0); const popupId = useRef(0);
+
+  const stageTitle = sessionData?.stageConfig?.[0]?.title || "OPPO CULTURE WORKSHOP";
+  const stageSubtitle = sessionData?.stageConfig?.[0]?.subtitle || "Quét QR để tham gia";
+
   useEffect(() => {
     if (!url) return;
     QRCode.toDataURL(url, { width: 360, margin: 2, color: { dark: "#ffffff", light: "#00000000" } }).then(setQr).catch(console.error);
@@ -60,12 +107,12 @@ function HostWelcome({ url, users, onStart }) {
         <img src="/mascot.png" alt="OPPO Mascot" className="w-52 h-52 object-contain drop-shadow-2xl" onError={(e) => { e.target.style.display = "none"; }} />
         <div className="text-center">
           <h1 className="text-9xl font-black text-white tracking-tight leading-none">OPPO</h1>
-          <h2 className="text-6xl font-black text-emerald-400 tracking-wider mt-2">CULTURE WORKSHOP</h2>
+          <h2 className="text-6xl font-black text-emerald-400 tracking-wider mt-2">{stageTitle}</h2>
         </div>
         {qr && (
           <div className="flex flex-col items-center gap-4">
             <div className="bg-white/10 border border-white/20 rounded-3xl p-6"><img src={qr} alt="QR" className="w-64 h-64" /></div>
-            <p className="text-gray-300 text-2xl">Quét QR để tham gia</p>
+            <p className="text-gray-300 text-2xl">{stageSubtitle}</p>
             <p className="text-emerald-400 font-mono text-lg">{url}</p>
           </div>
         )}
@@ -98,14 +145,17 @@ function HostWelcome({ url, users, onStart }) {
 }
 
 // Stage 1: Ice Breaking
-function HostIceBreaking({ totalHearts, users }) {
+function HostIceBreaking({ totalHearts, users, sessionData }) {
+  const title = sessionData?.stageConfig?.[1]?.title || "WELCOME TO OPPO CULTURE WORKSHOP";
+  const subtitle = sessionData?.stageConfig?.[1]?.subtitle || "Thả tim để làm nóng không khí! 🔥";
   return (
     <div className="flex flex-col items-center justify-center h-full gap-10">
       <div className="inline-flex items-center gap-4 bg-rose-500/10 border border-rose-500/30 rounded-full px-8 py-3">
         <span className="w-4 h-4 rounded-full bg-rose-400 animate-pulse" />
         <span className="text-rose-400 text-3xl font-black tracking-widest">STAGE 1 — ICE BREAKING</span>
       </div>
-      <h1 className="text-8xl font-black text-white leading-tight text-center">WELCOME TO<br /><span className="text-emerald-400">OPPO CULTURE WORKSHOP</span></h1>
+      <h1 className="text-7xl font-black text-white leading-tight text-center">{title}</h1>
+      {subtitle && <p className="text-gray-400 text-2xl">{subtitle}</p>}
       <p className="text-[10rem] font-black text-rose-400 leading-none">{totalHearts} ❤️</p>
       <div className="flex flex-wrap justify-center gap-4 max-w-5xl px-8">
         {users.map((u) => <span key={u.uid} className="bg-white/10 border border-white/20 rounded-full px-6 py-2 text-white text-xl">{u.name}</span>)}
@@ -123,6 +173,10 @@ function HostBietDeHieu({ sessionData, s2answers, onShowAnswer, onNext }) {
   const [timeLeft, setTimeLeft] = useState(30);
   const timerRef = useRef(null);
   const q = questions[currentQ];
+
+  const title = sessionData?.stageConfig?.[2]?.title || "BIẾT ĐỂ HIỂU";
+  const subtitle = sessionData?.stageConfig?.[2]?.subtitle || "";
+
   useEffect(() => {
     setTimeLeft(30); clearInterval(timerRef.current);
     if (!q || gameEnded) return;
@@ -152,9 +206,16 @@ function HostBietDeHieu({ sessionData, s2answers, onShowAnswer, onNext }) {
   return (
     <div className="flex flex-col h-full p-12 gap-8">
       <div className="flex items-center justify-between">
-        <div className="inline-flex items-center gap-4 bg-blue-500/10 border border-blue-500/30 rounded-full px-8 py-3"><span className="w-4 h-4 rounded-full bg-blue-400 animate-pulse" /><span className="text-blue-400 text-2xl font-bold">STAGE 2 — BIẾT ĐỂ HIỂU</span></div>
-        <div className="flex items-center gap-6"><span className="text-gray-400 text-2xl">Câu {currentQ + 1}/{questions.length}</span><div className={`font-black text-5xl ${timeLeft <= 10 ? "text-red-400 animate-pulse" : "text-white"}`}>{timeLeft}s</div></div>
+        <div className="inline-flex items-center gap-4 bg-blue-500/10 border border-blue-500/30 rounded-full px-8 py-3">
+          <span className="w-4 h-4 rounded-full bg-blue-400 animate-pulse" />
+          <span className="text-blue-400 text-2xl font-bold">STAGE 2 — {title}</span>
+        </div>
+        <div className="flex items-center gap-6">
+          <span className="text-gray-400 text-2xl">Câu {currentQ + 1}/{questions.length}</span>
+          <div className={`font-black text-5xl ${timeLeft <= 10 ? "text-red-400 animate-pulse" : "text-white"}`}>{timeLeft}s</div>
+        </div>
       </div>
+      {subtitle && <p className="text-gray-500 text-xl -mt-4">{subtitle}</p>}
       <div className="h-4 bg-white/10 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all duration-1000 ${timeLeft > 10 ? "bg-blue-500" : "bg-red-500"}`} style={{ width: `${(timeLeft / 30) * 100}%` }} /></div>
       <div className="bg-white/5 border border-white/10 rounded-3xl p-12 flex-1 flex items-center justify-center"><p className="text-white text-5xl font-bold leading-relaxed text-center">{q.question}</p></div>
       {showAns && <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-3xl px-10 py-6 text-center"><p className="text-emerald-400 font-black text-4xl">✓ Đáp án: {q.answer}</p></div>}
@@ -177,6 +238,9 @@ function HostGiaiMaHanhVi({ sessionData, s3answers, users, onEndGame }) {
   const TOTAL_TIME = 600;
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
   const questions = sessionData?.s3questions || [];
+  const title = sessionData?.stageConfig?.[3]?.title || "GIẢI MÃ HÀNH VI";
+  const subtitle = sessionData?.stageConfig?.[3]?.subtitle || "";
+
   useEffect(() => {
     if (!gameStartTime || gameEnded) return;
     const tick = () => { const e = Math.floor((Date.now() - gameStartTime) / 1000); setTimeLeft(Math.max(0, TOTAL_TIME - e)); };
@@ -190,7 +254,13 @@ function HostGiaiMaHanhVi({ sessionData, s3answers, users, onEndGame }) {
     <div className="flex h-full p-12 gap-10">
       <div className="flex-1 flex flex-col gap-8">
         <div className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-4 bg-purple-500/10 border border-purple-500/30 rounded-full px-8 py-3"><span className="w-4 h-4 rounded-full bg-purple-400 animate-pulse" /><span className="text-purple-400 text-2xl font-bold">STAGE 3 — GIẢI MÃ HÀNH VI</span></div>
+          <div>
+            <div className="inline-flex items-center gap-4 bg-purple-500/10 border border-purple-500/30 rounded-full px-8 py-3">
+              <span className="w-4 h-4 rounded-full bg-purple-400 animate-pulse" />
+              <span className="text-purple-400 text-2xl font-bold">STAGE 3 — {title}</span>
+            </div>
+            {subtitle && <p className="text-gray-500 text-lg mt-2 ml-2">{subtitle}</p>}
+          </div>
           <div className={`font-black text-7xl ${timeLeft < 60 ? "text-red-400 animate-pulse" : "text-white"}`}>⏱ {mins}:{secs.toString().padStart(2, "0")}</div>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center gap-8">
@@ -217,16 +287,20 @@ function HostGiaiMaHanhVi({ sessionData, s3answers, users, onEndGame }) {
 }
 
 // Stage 4: Thảo Luận Nhóm
-function HostThaoLuanNhom({ sessionData, groupHearts, totalGroupHearts }) {
+function HostThaoLuanNhom({ sessionData, totalGroupHearts }) {
   const groups = sessionData?.groups || [];
   const activeGroup = sessionData?.activeGroup || null;
   const activeGroupData = groups.find((g) => g.id === activeGroup);
+  const title = sessionData?.stageConfig?.[4]?.title || "THẢO LUẬN NHÓM";
+  const subtitle = sessionData?.stageConfig?.[4]?.subtitle || "";
+
   return (
     <div className="flex flex-col items-center justify-center h-full gap-10">
       <div className="inline-flex items-center gap-4 bg-orange-500/10 border border-orange-500/30 rounded-full px-8 py-3">
         <span className="w-4 h-4 rounded-full bg-orange-400 animate-pulse" />
-        <span className="text-orange-400 text-3xl font-black tracking-widest">STAGE 4 — THẢO LUẬN NHÓM</span>
+        <span className="text-orange-400 text-3xl font-black tracking-widest">STAGE 4 — {title}</span>
       </div>
+      {subtitle && <p className="text-gray-400 text-2xl -mt-4">{subtitle}</p>}
       {activeGroupData ? (
         <div className="text-center">
           <p className="text-gray-400 text-2xl mb-3">Đang trình bày:</p>
@@ -253,31 +327,35 @@ function HostThaoLuanNhom({ sessionData, groupHearts, totalGroupHearts }) {
 }
 
 // Stage 5: DNA Sharing
-function HostDNASharing({ totalHearts }) {
+function HostDNASharing({ totalHearts, sessionData }) {
+  const title = sessionData?.stageConfig?.[5]?.title || "DNA SHARING";
+  const subtitle = sessionData?.stageConfig?.[5]?.subtitle || "Lắng nghe những câu chuyện thực tế";
   return (
     <div className="flex flex-col items-center justify-center h-full gap-10">
       <div className="inline-flex items-center gap-4 bg-purple-500/10 border border-purple-500/30 rounded-full px-8 py-3">
         <span className="w-4 h-4 rounded-full bg-purple-400 animate-pulse" />
-        <span className="text-purple-400 text-3xl font-black tracking-widest">STAGE 5 — DNA SHARING</span>
+        <span className="text-purple-400 text-3xl font-black tracking-widest">STAGE 5 — {title}</span>
       </div>
-      <h2 className="text-8xl font-black text-white">Màn chia sẻ 💬</h2>
-      <p className="text-gray-400 text-3xl">Lắng nghe những câu chuyện thực tế</p>
+      <h2 className="text-8xl font-black text-white">{subtitle}</h2>
       <p className="text-[10rem] font-black text-rose-400 leading-none">{totalHearts} ❤️</p>
     </div>
   );
 }
 
-// Stage 6: Keywords word cloud
-function HostKeywords({ keywords }) {
+// FIX 6: Stage 6 — Keywords với màu nổi bật, tránh tràn header
+function HostKeywords({ keywords, sessionData }) {
   const allWords = keywords.flatMap((k) => k.words || []);
   const [floaters, setFloaters] = useState([]);
+  const title = sessionData?.stageConfig?.[6]?.title || "KEYWORDS";
+  const subtitle = sessionData?.stageConfig?.[6]?.subtitle || "";
 
   useEffect(() => {
+    // FIX 6: y bắt đầu từ 18% để tránh đè lên header
     const placed = allWords.map((word, i) => ({
       word, id: i,
-      x: 5 + Math.random() * 85,
-      y: 5 + Math.random() * 80,
-      size: 28 + Math.random() * 36,
+      x: 3 + Math.random() * 88,
+      y: 18 + Math.random() * 72,
+      size: 32 + Math.random() * 40,
       delay: Math.random() * 3,
       speed: 3 + Math.random() * 4,
     }));
@@ -285,30 +363,39 @@ function HostKeywords({ keywords }) {
   }, [keywords.length]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden" style={{ background: "linear-gradient(135deg, #ffffff 0%, #ecfdf5 40%, #d1fae5 100%)" }}>
+    // FIX 6: Nền tối để chữ màu emerald nổi bật hơn
+    <div className="relative h-full w-full overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950">
       <style>{`
         @keyframes floatKeyword {
           0% { transform: translateY(0px) rotate(-2deg); }
-          100% { transform: translateY(-18px) rotate(2deg); }
+          100% { transform: translateY(-20px) rotate(2deg); }
         }
       `}</style>
-      {/* Header */}
-      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 text-center">
-        <div className="inline-flex items-center gap-3 bg-emerald-500/20 border border-emerald-500/40 rounded-full px-8 py-3 backdrop-blur-sm">
-          <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-emerald-700 text-2xl font-black tracking-widest">STAGE 6 — KEYWORDS</span>
+
+      {/* FIX 6: Header nằm hẳn trên cùng, có backdrop */}
+      <div className="absolute top-0 left-0 right-0 z-20 px-8 py-6"
+        style={{ background: "linear-gradient(to bottom, rgba(3,7,18,0.95) 70%, transparent)" }}>
+        <div className="flex items-center justify-between">
+          <div className="inline-flex items-center gap-3 bg-emerald-500/20 border border-emerald-500/40 rounded-full px-8 py-3 backdrop-blur-sm">
+            <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-emerald-400 text-2xl font-black tracking-widest">STAGE 6 — {title}</span>
+          </div>
+          <div className="text-right">
+            <p className="text-emerald-400 text-xl font-bold">{allWords.length} keyword</p>
+            <p className="text-gray-500 text-sm">từ {keywords.length} người</p>
+          </div>
         </div>
-        <p className="text-emerald-600 text-xl mt-3 font-semibold">{allWords.length} keyword từ {keywords.length} người</p>
+        {subtitle && <p className="text-gray-400 text-lg mt-2 ml-2">{subtitle}</p>}
       </div>
 
-      {/* Floating words */}
+      {/* Floating keywords */}
       {floaters.map((f) => (
         <FloatingKeyword key={f.id} word={f.word} x={f.x} y={f.y} size={f.size} delay={f.delay} speed={f.speed} />
       ))}
 
       {allWords.length === 0 && (
         <div className="flex items-center justify-center h-full">
-          <p className="text-emerald-400 text-3xl font-bold opacity-50">Chờ mọi người điền keyword…</p>
+          <p className="text-emerald-600 text-3xl font-bold opacity-50">Chờ mọi người điền keyword…</p>
         </div>
       )}
     </div>
@@ -316,9 +403,11 @@ function HostKeywords({ keywords }) {
 }
 
 // Stage 7: Kết quả → NOW YOU ARE OPPOER
-function HostKetQua({ scores }) {
+function HostKetQua({ scores, sessionData }) {
   const [showEnd, setShowEnd] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const title = sessionData?.stageConfig?.[7]?.title || "BẢNG XẾP HẠNG";
+  const subtitle = sessionData?.stageConfig?.[7]?.subtitle || "";
 
   function handleEnd() {
     setTransitioning(true);
@@ -342,8 +431,9 @@ function HostKetQua({ scores }) {
     <div className={`flex flex-col h-full p-12 gap-8 transition-opacity duration-700 ${transitioning ? "opacity-0" : "opacity-100"}`}>
       <div className="text-center">
         <div className="inline-flex items-center gap-4 bg-yellow-500/10 border border-yellow-500/30 rounded-full px-8 py-3">
-          <span className="text-yellow-400 text-2xl font-bold tracking-widest">🏆 STAGE 7 — BẢNG XẾP HẠNG</span>
+          <span className="text-yellow-400 text-2xl font-bold tracking-widest">🏆 STAGE 7 — {title}</span>
         </div>
+        {subtitle && <p className="text-gray-400 text-xl mt-2">{subtitle}</p>}
       </div>
       <div className="flex justify-center items-end gap-10">
         {[1, 0, 2].map((i) => {
@@ -448,6 +538,18 @@ export default function HostPage() {
 
   const isKeywordStage = stage === 6;
 
+  const renderStage = () => {
+    if (stage === 0) return <HostWelcome url={siteUrl} users={users} onStart={handleStart} sessionData={sessionData} />;
+    if (stage === 1) return <HostIceBreaking totalHearts={totalHearts} users={users} sessionData={sessionData} />;
+    if (stage === 2) return <HostBietDeHieu sessionData={sessionData} s2answers={s2answers} onShowAnswer={handleS2ShowAnswer} onNext={handleS2Next} />;
+    if (stage === 3) return <HostGiaiMaHanhVi sessionData={sessionData} s3answers={s3answers} users={users} onEndGame={handleS3EndGame} />;
+    if (stage === 4) return <HostThaoLuanNhom sessionData={sessionData} totalGroupHearts={totalGroupHearts} />;
+    if (stage === 5) return <HostDNASharing totalHearts={totalHearts} sessionData={sessionData} />;
+    if (stage === 6) return <HostKeywords keywords={keywords} sessionData={sessionData} />;
+    if (stage === 7) return <HostKetQua scores={scores} sessionData={sessionData} />;
+    return null;
+  };
+
   return (
     <>
       <Head>
@@ -458,22 +560,24 @@ export default function HostPage() {
           .animate-slideIn { animation: slideIn 0.4s cubic-bezier(.34,1.56,.64,1) forwards; }
         `}</style>
       </Head>
-      <div className={`relative overflow-hidden transition-colors duration-1000 ${isKeywordStage ? "" : "bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950"}`} style={{ height: "100vh", width: "100vw" }}>
+      <div className={`relative overflow-hidden ${isKeywordStage ? "" : "bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950"}`}
+        style={{ height: "100vh", width: "100vw" }}>
+        {/* Floating hearts — chỉ hiện khi không phải keyword stage */}
         {!isKeywordStage && (
           <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden">
-            {allHearts.map((h) => <FloatingHeart key={h.id} id={h.id} x={h.x} onDone={() => { setHearts((x) => x.filter((i) => i.id !== h.id)); setGroupHearts((x) => x.filter((i) => i.id !== h.id)); }} />)}
+            {allHearts.map((h) => (
+              <FloatingHeart key={h.id} id={h.id} x={h.x}
+                onDone={() => {
+                  setHearts((x) => x.filter((i) => i.id !== h.id));
+                  setGroupHearts((x) => x.filter((i) => i.id !== h.id));
+                }} />
+            ))}
           </div>
         )}
-        <div className="h-full w-full">
-          {stage === 0 && <HostWelcome url={siteUrl} users={users} onStart={handleStart} />}
-          {stage === 1 && <HostIceBreaking totalHearts={totalHearts} users={users} />}
-          {stage === 2 && <HostBietDeHieu sessionData={sessionData} s2answers={s2answers} onShowAnswer={handleS2ShowAnswer} onNext={handleS2Next} />}
-          {stage === 3 && <HostGiaiMaHanhVi sessionData={sessionData} s3answers={s3answers} users={users} onEndGame={handleS3EndGame} />}
-          {stage === 4 && <HostThaoLuanNhom sessionData={sessionData} groupHearts={groupHearts} totalGroupHearts={totalGroupHearts} />}
-          {stage === 5 && <HostDNASharing totalHearts={totalHearts} />}
-          {stage === 6 && <HostKeywords keywords={keywords} />}
-          {stage === 7 && <HostKetQua scores={scores} />}
-        </div>
+        {/* FIX 2: Stage transition mượt */}
+        <StageTransition stage={stage}>
+          {renderStage()}
+        </StageTransition>
       </div>
     </>
   );
