@@ -56,7 +56,7 @@ function StageLogin({ onJoin }) {
   const [name, setName] = useState(""); const [dept, setDept] = useState(""); const [loading, setLoading] = useState(false);
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 flex flex-col items-center justify-center px-6 gap-6">
-      <img src="/mascot.png" alt="OPPO" className="w-28 h-28 object-contain drop-shadow-xl" />
+      <img src="/mascot.png" alt="OPPO" className="w-36 h-36 object-contain drop-shadow-xl" />
       <div className="text-center"><h1 className="text-3xl font-black text-white">OPPO <span className="text-emerald-400">CULTURE</span></h1><h2 className="text-xl font-black text-white">WORKSHOP</h2></div>
       <div className="w-full max-w-xs space-y-3">
         <input className="w-full bg-white/10 border border-white/20 rounded-2xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500" placeholder="Họ và tên *" value={name} onChange={(e) => setName(e.target.value)} />
@@ -74,7 +74,7 @@ function StageLogin({ onJoin }) {
 function StageWaiting({ userName }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 flex flex-col items-center justify-center gap-4 px-6 text-center">
-      <img src="/mascot.png" alt="OPPO" className="w-24 h-24 object-contain" />
+      <img src="/mascot.png" alt="OPPO" className="w-32 h-32 object-contain" />
       <h1 className="text-2xl font-black text-white">Xin chào <span className="text-emerald-400">{userName}</span>!</h1>
       <div className="flex items-center gap-2 mt-2"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /><span className="text-emerald-400 text-sm">Chờ Host bắt đầu…</span></div>
     </div>
@@ -209,12 +209,30 @@ function StageGiaiMaHanhVi({ userId, userName, sessionData }) {
   const gameEnded = sessionData?.s3ended || false;
   const TOTAL_TIME = 600;
   const [answers, setAnswers] = useState({}); const [submitted, setSubmitted] = useState(false); const [timeLeft, setTimeLeft] = useState(TOTAL_TIME); const [currentView, setCurrentView] = useState(0);
+  const [myResult, setMyResult] = useState(null);
 
   useEffect(() => {
     if (!gameStartTime || gameEnded) return;
     const tick = () => { const e = Math.floor((Date.now() - gameStartTime) / 1000); setTimeLeft(Math.max(0, TOTAL_TIME - e)); };
     tick(); const t = setInterval(tick, 1000); return () => clearInterval(t);
   }, [gameStartTime, gameEnded]);
+
+  // Fetch my result locally to display on submission screen
+  useEffect(() => {
+    const unsub = onValue(ref(db, `s3answers/${userId}`), (snap) => {
+      if (snap.exists()) {
+        const d = snap.val();
+        setSubmitted(true);
+        let correct = 0;
+        if (d.answers) Object.values(d.answers).forEach((a) => { if (a.correct) correct++; });
+        setMyResult({ correct, total: questions.length });
+      } else {
+        setSubmitted(false);
+        setMyResult(null);
+      }
+    });
+    return () => unsub();
+  }, [userId, questions.length]);
 
   async function handleSubmitAll() {
     if (submitted) return; setSubmitted(true);
@@ -234,7 +252,14 @@ function StageGiaiMaHanhVi({ userId, userName, sessionData }) {
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 flex flex-col items-center justify-center gap-4 text-center px-6">
       <div className="text-5xl">✅</div>
       <h2 className="text-2xl font-black text-white">Đã nộp bài!</h2>
-      <p className="text-gray-400 text-sm">Chờ Host tổng kết…</p>
+      {myResult && gameEnded && (
+        <div className="bg-white/10 rounded-2xl p-5 mt-2 shadow-lg drop-shadow-md">
+          <p className="text-gray-300 font-semibold mb-1">Kết quả của bạn</p>
+          <p className="text-emerald-400 font-black text-4xl">{myResult.correct} <span className="text-gray-400 text-xl font-bold">/ {myResult.total}</span></p>
+          <p className="text-xs text-gray-400 mt-2 uppercase tracking-wide">Số câu đúng</p>
+        </div>
+      )}
+      {!gameEnded && <p className="text-gray-400 text-sm">Chờ Host tổng kết…</p>}
     </div>
   );
   if (!questions.length) return <StageWaiting userName={userName} />;
@@ -554,7 +579,7 @@ function StageKeywords({ userId, userName }) {
 }
 
 // ── Stage 7: Kết quả ──────────────────────────────────────────────────────────
-function StageKetQua({ userId }) {
+function StageKetQua({ userId, sessionData }) {
   const [scores, setScores] = useState([]); const [myRank, setMyRank] = useState(null);
   useEffect(() => {
     const u = onValue(ref(db, "scores"), (snap) => {
@@ -566,6 +591,18 @@ function StageKetQua({ userId }) {
     });
     return () => u();
   }, [userId]);
+
+  if (sessionData?.showNow) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6 text-center px-4" style={{ background: "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)" }}>
+      <img src="/mascot.png" alt="mascot" className="w-48 h-48 object-contain drop-shadow-2xl animate-bounce" onError={(e) => { e.target.style.display = "none"; }} />
+      <div>
+        <p className="text-emerald-300 text-xl font-semibold tracking-widest mb-2">CHÀO MỪNG BẠN</p>
+        <h1 className="text-5xl font-black text-white leading-none tracking-tight">NOW YOU ARE</h1>
+        <h2 className="text-[3.5rem] font-black leading-none mt-2" style={{ color: "#34d399", textShadow: "0 0 40px rgba(52,211,153,0.6)" }}>OPPOER</h2>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 flex flex-col px-4 py-8 gap-5">
       <div className="text-center">
@@ -608,6 +645,18 @@ export default function EmployeePage() {
     return () => u();
   }, []);
 
+  // Logout if user is removed from Firebase DB by Admin
+  useEffect(() => {
+    if (!userId) return;
+    const u = onValue(ref(db, `users/${userId}`), (snap) => {
+      if (!snap.exists() && userName) {
+        localStorage.removeItem("oppo_name");
+        setUserName(null);
+      }
+    });
+    return () => u();
+  }, [userId, userName]);
+
   // groupCards reset handled by Firebase (admin resetParticipants clears session/groupCards)
 
   async function handleJoin(name, dept) {
@@ -627,7 +676,7 @@ export default function EmployeePage() {
     if (stage === 4) return <StageThaoLuanNhom userId={userId} sessionData={sessionData} />;
     if (stage === 5) return <StageDNASharing userId={userId} />;
     if (stage === 6) return <StageKeywords userId={userId} userName={userName} />;
-    if (stage === 7) return <StageKetQua userId={userId} />;
+    if (stage === 7) return <StageKetQua userId={userId} sessionData={sessionData} />;
     return null;
   };
 

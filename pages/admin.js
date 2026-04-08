@@ -146,6 +146,7 @@ export default function AdminPage() {
       set(ref(db, "session/s3startTime"), null),
       set(ref(db, "session/s3reviewIndex"), 0),
       set(ref(db, "session/activeGroup"), null),
+      set(ref(db, "session/showNow"), false),
       clearedGroups.length > 0 ? set(ref(db, "session/groups"), clearedGroups) : Promise.resolve(),
     ]);
   }
@@ -169,6 +170,7 @@ export default function AdminPage() {
       set(ref(db, "session/s3startTime"), null),
       set(ref(db, "session/s3reviewIndex"), 0),
       set(ref(db, "session/activeGroup"), null),
+      set(ref(db, "session/showNow"), false),
       set(ref(db, "session/groups"), []),
       set(ref(db, "session/s2questions"), []),
       set(ref(db, "session/s3questions"), []),

@@ -38,9 +38,9 @@ function JoinPopup({ name, dept, onDone }) {
 // Keywords: màu emerald tối trên nền trắng
 function FloatingKeyword({ word, x, y, size, delay, speed }) {
   const EMERALD_DARK = [
-    "#065f46", "#047857", "#059669", "#0f766e",
-    "#0d9488", "#166534", "#15803d", "#0369a1",
-    "#1d4ed8", "#4f46e5", "#7c3aed", "#0891b2",
+    "#022c22", "#064e3b", "#065f46", "#047857",
+    "#059669", "#10b981", "#34d399", "#6ee7b7",
+    "#0f766e", "#115e59", "#134e4a", "#0f766e"
   ];
   const color = EMERALD_DARK[Math.floor(Math.abs(word.charCodeAt(0) + x * 7)) % EMERALD_DARK.length];
   return (
@@ -540,14 +540,20 @@ function HostKeywords({ keywords, sessionData }) {
 
 // Stage 7: Kết quả → NOW YOU ARE OPPOER
 function HostKetQua({ scores, sessionData }) {
-  const [showEnd, setShowEnd] = useState(false);
+  const showEnd = sessionData?.showNow || false;
   const [transitioning, setTransitioning] = useState(false);
   const title = sessionData?.stageConfig?.[7]?.title || "BẢNG XẾP HẠNG";
   const subtitle = sessionData?.stageConfig?.[7]?.subtitle || "";
 
   function handleEnd() {
     setTransitioning(true);
-    setTimeout(() => setShowEnd(true), 800);
+    setTimeout(async () => {
+      await set(ref(db, "session/showNow"), true);
+    }, 800);
+  }
+
+  async function handleBack() {
+    await set(ref(db, "session/showNow"), false);
   }
 
   if (showEnd) return (
@@ -558,7 +564,7 @@ function HostKetQua({ scores, sessionData }) {
         <h1 className="text-[8rem] font-black text-white leading-none tracking-tight">NOW YOU ARE</h1>
         <h2 className="text-[9rem] font-black leading-none" style={{ color: "#34d399", textShadow: "0 0 60px rgba(52,211,153,0.6)" }}>OPPOER</h2>
       </div>
-      <button onClick={() => setShowEnd(false)} className="mt-4 text-emerald-600 text-lg underline">← Quay lại</button>
+      <button onClick={handleBack} className="mt-4 text-emerald-600 text-lg underline">← Quay lại</button>
     </div>
   );
 
