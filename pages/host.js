@@ -6,10 +6,20 @@ import Head from "next/head";
 import { CULTURE_VALUES } from "../data/cultureValues";
 import QRCode from "qrcode";
 
+const DEFAULT_CARDS_FALLBACK = [
+  { id: "c1", icon: "🎯", label: "BỔN PHẬN", color: "from-emerald-500 to-green-400", back: "from-emerald-900 to-green-900" },
+  { id: "c2", icon: "🤝", label: "HƯỚNG ĐẾN KHÁCH HÀNG", color: "from-teal-500 to-cyan-400", back: "from-teal-900 to-cyan-900" },
+  { id: "c3", icon: "⭐", label: "THEO ĐUỔI SỰ XUẤT SẮC", color: "from-green-500 to-emerald-400", back: "from-green-900 to-emerald-900" },
+  { id: "c4", icon: "🏆", label: "HƯỚNG ĐẾN KẾT QUẢ", color: "from-cyan-500 to-teal-400", back: "from-cyan-900 to-teal-900" },
+];
+
+// Tim có kích thước to nhỏ xen kẽ
 function FloatingHeart({ id, x, onDone }) {
-  const emojis = ["❤️", "💚", "🩷", "💛", "🧡"];
+  const emojis = ["❤️", "💚", "🩷", "💛", "🧡", "❤️", "🩷", "❤️"];
   const emoji = emojis[id % emojis.length];
-  const size = 40 + (id % 3) * 18; const dur = 2.5 + (id % 4) * 0.5;
+  const sizes = [48, 80, 56, 120, 64, 96, 44, 140];
+  const size = sizes[id % sizes.length];
+  const dur = 2.5 + (id % 5) * 0.6;
   useEffect(() => { const t = setTimeout(onDone, dur * 1000); return () => clearTimeout(t); }, []);
   return <span className="absolute bottom-0 pointer-events-none select-none" style={{ left: `${x}%`, fontSize: size, animation: `floatUp ${dur}s ease-out forwards` }}>{emoji}</span>;
 }
@@ -25,14 +35,14 @@ function JoinPopup({ name, dept, onDone }) {
   );
 }
 
-// ── FIX 6: Floating keyword với màu tốt hơn, tránh tràn lên header ────────────
+// Keywords: màu emerald tối trên nền trắng
 function FloatingKeyword({ word, x, y, size, delay, speed }) {
-  const colors = [
-    "#10b981", "#059669", "#047857",
-    "#0d9488", "#0891b2", "#0e7490",
-    "#16a34a", "#15803d",
+  const EMERALD_DARK = [
+    "#065f46", "#047857", "#059669", "#0f766e",
+    "#0d9488", "#166534", "#15803d", "#0369a1",
+    "#1d4ed8", "#4f46e5", "#7c3aed", "#0891b2",
   ];
-  const color = colors[Math.floor(Math.random() * colors.length)];
+  const color = EMERALD_DARK[Math.floor(Math.abs(word.charCodeAt(0) + x * 7)) % EMERALD_DARK.length];
   return (
     <span
       className="absolute font-black select-none pointer-events-none"
@@ -42,9 +52,8 @@ function FloatingKeyword({ word, x, y, size, delay, speed }) {
         fontSize: size,
         color,
         animation: `floatKeyword ${speed}s ease-in-out ${delay}s infinite alternate`,
-        textShadow: `0 0 30px ${color}99, 0 2px 8px rgba(0,0,0,0.8)`,
-        WebkitTextStroke: "0.5px rgba(255,255,255,0.15)",
-        filter: `drop-shadow(0 0 12px ${color}88)`,
+        textShadow: `0 4px 20px ${color}44`,
+        filter: `drop-shadow(0 2px 8px ${color}33)`,
       }}
     >{word}</span>
   );
@@ -237,6 +246,7 @@ function HostGiaiMaHanhVi({ sessionData, s3answers, users, onEndGame }) {
   const gameStartTime = sessionData?.s3startTime || null;
   const TOTAL_TIME = 600;
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
+  const [reviewIdx, setReviewIdx] = useState(0);
   const questions = sessionData?.s3questions || [];
   const title = sessionData?.stageConfig?.[3]?.title || "GIẢI MÃ HÀNH VI";
   const subtitle = sessionData?.stageConfig?.[3]?.subtitle || "";
@@ -246,10 +256,79 @@ function HostGiaiMaHanhVi({ sessionData, s3answers, users, onEndGame }) {
     const tick = () => { const e = Math.floor((Date.now() - gameStartTime) / 1000); setTimeLeft(Math.max(0, TOTAL_TIME - e)); };
     tick(); const t = setInterval(tick, 1000); return () => clearInterval(t);
   }, [gameStartTime, gameEnded]);
+
   const submitted = Object.keys(s3answers).length;
   const total = users.length;
   const mins = Math.floor(timeLeft / 60); const secs = timeLeft % 60;
   const leaderboard = Object.values(s3answers).sort((a, b) => a.elapsed - b.elapsed).slice(0, 5);
+
+  // ── Review Screen khi game kết thúc ──
+  if (gameEnded && questions.length > 0) {
+    const q = questions[reviewIdx];
+    const OPT_COLORS = { A: "from-emerald-600 to-green-500", B: "from-teal-600 to-cyan-500", C: "from-green-600 to-emerald-500", D: "from-cyan-600 to-teal-500" };
+    // Tính thống kê chọn đáp án
+    const answerStats = { A: 0, B: 0, C: 0, D: 0 };
+    Object.values(s3answers).forEach((r) => {
+      const ans = r.answers?.[reviewIdx]?.answer;
+      if (ans && answerStats[ans] !== undefined) answerStats[ans]++;
+    });
+    const maxVotes = Math.max(...Object.values(answerStats), 1);
+
+    return (
+      <div className="flex flex-col h-full p-10 gap-6">
+        <div className="flex items-center justify-between">
+          <div className="inline-flex items-center gap-4 bg-purple-500/10 border border-purple-500/30 rounded-full px-8 py-3">
+            <span className="w-4 h-4 rounded-full bg-purple-400 animate-pulse" />
+            <span className="text-purple-400 text-2xl font-bold">REVIEW — {title}</span>
+          </div>
+          <span className="text-gray-500 text-2xl">Câu {reviewIdx + 1} / {questions.length}</span>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 rounded-3xl p-8 flex-1 flex flex-col gap-6">
+          <p className="text-white text-4xl font-bold leading-relaxed">{q.question}</p>
+          <div className="grid grid-cols-2 gap-4 flex-1">
+            {["A", "B", "C", "D"].map((opt) => {
+              const isCorrect = opt === q.correct;
+              const count = answerStats[opt];
+              const pct = Math.round((count / Math.max(submitted, 1)) * 100);
+              return (
+                <div key={opt} className={`rounded-2xl p-5 relative overflow-hidden border-2 ${isCorrect ? "border-emerald-400 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}>
+                  <div className="absolute inset-0 rounded-2xl opacity-20 bg-gradient-to-br " style={{ width: `${pct}%`, background: isCorrect ? "#10b981" : "#6b7280", transition: "width 1s ease" }} />
+                  <div className="relative z-10 flex items-start gap-3">
+                    <span className={`text-3xl font-black ${isCorrect ? "text-emerald-400" : "text-gray-400"}`}>{opt}</span>
+                    <div className="flex-1">
+                      <p className={`text-xl font-semibold leading-tight ${isCorrect ? "text-emerald-300" : "text-white"}`}>{q[`opt${opt}`]}</p>
+                      <p className={`text-lg mt-2 font-black ${isCorrect ? "text-emerald-400" : "text-gray-400"}`}>{count} người ({pct}%)</p>
+                    </div>
+                    {isCorrect && <span className="text-4xl">✅</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <button onClick={() => setReviewIdx((i) => Math.max(0, i - 1))} disabled={reviewIdx === 0}
+            className="px-10 py-5 rounded-2xl bg-white/10 text-white font-black text-2xl disabled:opacity-30 hover:bg-white/20 active:scale-95">
+            ← Trước
+          </button>
+          <p className="text-gray-500 text-xl">{submitted} người đã nộp bài</p>
+          {reviewIdx < questions.length - 1 ? (
+            <button onClick={() => setReviewIdx((i) => i + 1)}
+              className="px-10 py-5 rounded-2xl bg-purple-600 text-white font-black text-2xl hover:bg-purple-500 active:scale-95">
+              Tiếp →
+            </button>
+          ) : (
+            <div className="px-10 py-5 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black text-2xl text-center">
+              ✅ Đã xem hết
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full p-12 gap-10">
       <div className="flex-1 flex flex-col gap-8">
@@ -267,7 +346,13 @@ function HostGiaiMaHanhVi({ sessionData, s3answers, users, onEndGame }) {
           <p className="text-[10rem] font-black text-white leading-none">{submitted}</p>
           <p className="text-4xl text-gray-400">/ {total} đã nộp bài</p>
           <div className="w-full max-w-2xl h-6 bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-purple-500 to-violet-400 rounded-full transition-all duration-500" style={{ width: `${total > 0 ? (submitted / total) * 100 : 0}%` }} /></div>
-          <p className="text-gray-500 text-2xl">{questions.length} câu • Đúng +20đ • Hoàn thành sớm +50đ</p>
+          <p className="text-gray-500 text-xl">{questions.length} câu hỏi</p>
+          {submitted >= total && total > 0 && (
+            <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-6 py-3">
+              <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
+              <p className="text-emerald-400 text-2xl font-bold">✅ Tất cả đã nộp bài!</p>
+            </div>
+          )}
         </div>
         {!gameEnded ? <div className="text-center"><button onClick={onEndGame} className="px-16 py-6 rounded-3xl bg-purple-600 text-white font-black text-3xl hover:bg-purple-500 active:scale-95 transition-all">Kết thúc ✓</button></div>
           : <p className="text-center text-emerald-400 font-black text-3xl">✅ Đã kết thúc</p>}
@@ -286,48 +371,99 @@ function HostGiaiMaHanhVi({ sessionData, s3answers, users, onEndGame }) {
   );
 }
 
-// Stage 4: Thảo Luận Nhóm
+// Stage 4: Thảo Luận Nhóm — Hiển thị thẻ bài theo nhóm
 function HostThaoLuanNhom({ sessionData, totalGroupHearts }) {
   const groups = sessionData?.groups || [];
   const activeGroup = sessionData?.activeGroup || null;
+  const groupCards = sessionData?.groupCards || {};
+  const cards = sessionData?.cards || DEFAULT_CARDS_FALLBACK;
   const activeGroupData = groups.find((g) => g.id === activeGroup);
   const title = sessionData?.stageConfig?.[4]?.title || "THẢO LUẬN NHÓM";
   const subtitle = sessionData?.stageConfig?.[4]?.subtitle || "";
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-10">
-      <div className="inline-flex items-center gap-4 bg-orange-500/10 border border-orange-500/30 rounded-full px-8 py-3">
-        <span className="w-4 h-4 rounded-full bg-orange-400 animate-pulse" />
-        <span className="text-orange-400 text-3xl font-black tracking-widest">STAGE 4 — {title}</span>
-      </div>
-      {subtitle && <p className="text-gray-400 text-2xl -mt-4">{subtitle}</p>}
-      {activeGroupData ? (
-        <div className="text-center">
-          <p className="text-gray-400 text-2xl mb-3">Đang trình bày:</p>
-          <h2 className="text-8xl font-black text-white">{activeGroupData.name}</h2>
-          <p className="text-gray-400 text-2xl mt-2">{(activeGroupData.members || []).length} thành viên</p>
-          <p className="text-[8rem] font-black text-rose-400 mt-6">{totalGroupHearts} ❤️</p>
-          <p className="text-gray-400 text-2xl">tim ủng hộ</p>
-        </div>
-      ) : (
-        <div className="text-center">
-          <p className="text-6xl font-black text-gray-600 mb-4">Chọn nhóm trình bày</p>
-          <p className="text-gray-500 text-2xl">Admin → chọn nhóm đang present</p>
-        </div>
-      )}
-      <div className="flex flex-wrap justify-center gap-4 max-w-4xl">
-        {groups.map((g) => (
-          <div key={g.id} className={`px-8 py-4 rounded-2xl text-xl font-bold transition-all ${g.id === activeGroup ? "bg-orange-500 text-white shadow-lg shadow-orange-500/40 scale-110" : "bg-white/10 text-gray-400"}`}>
-            {g.name}
+    <div className="flex flex-col h-full p-10 gap-5">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-shrink-0">
+        <div>
+          <div className="inline-flex items-center gap-4 bg-orange-500/10 border border-orange-500/30 rounded-full px-8 py-3">
+            <span className="w-4 h-4 rounded-full bg-orange-400 animate-pulse" />
+            <span className="text-orange-400 text-2xl font-black tracking-widest">STAGE 4 — {title}</span>
           </div>
-        ))}
+          {subtitle && <p className="text-gray-400 text-lg mt-1 ml-2">{subtitle}</p>}
+        </div>
+        {activeGroupData && (
+          <div className="flex items-center gap-3 bg-orange-500/20 border border-orange-500/40 rounded-2xl px-6 py-3">
+            <span className="text-2xl">🎤</span>
+            <div>
+              <p className="text-orange-400 text-sm">Đang present:</p>
+              <p className="text-white font-black text-xl">{activeGroupData.name}</p>
+            </div>
+            {totalGroupHearts > 0 && <p className="text-rose-400 font-black text-2xl ml-3">{totalGroupHearts} ❤️</p>}
+          </div>
+        )}
+      </div>
+
+      {/* Card Grid — lật khi nhóm chọn */}
+      <div className={`grid gap-5 flex-1 ${cards.length <= 4 ? "grid-cols-4" : "grid-cols-4"}`}>
+        {cards.map((card) => {
+          const pickedByGroupId = Object.entries(groupCards).find(([, cId]) => cId === card.id)?.[0];
+          const pickedByGroup = pickedByGroupId ? groups.find((g) => g.id === pickedByGroupId) : null;
+          const isFlipped = !!pickedByGroupId;
+          const isActive = pickedByGroupId === activeGroup;
+          return (
+            <div key={card.id} style={{ perspective: "1200px" }} className="relative">
+              <div style={{
+                transformStyle: "preserve-3d",
+                transition: "transform 1s cubic-bezier(.4,2,.6,1)",
+                transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+                width: "100%", paddingBottom: "133%", position: "relative"
+              }}>
+                {/* Mặt úp */}
+                <div style={{ backfaceVisibility: "hidden", position: "absolute", inset: 0 }}
+                  className={`rounded-3xl bg-gradient-to-br ${card.back || "from-gray-800 to-gray-700"} flex items-center justify-center shadow-2xl border border-white/10`}>
+                  <span className="text-8xl opacity-10">🎴</span>
+                </div>
+                {/* Mặt ngửa */}
+                <div style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)", position: "absolute", inset: 0 }}
+                  className={`rounded-3xl bg-gradient-to-br ${card.color} flex flex-col items-center justify-center gap-4 p-6 shadow-2xl ${isActive ? "ring-4 ring-white/60" : ""}`}>
+                  <span className="text-6xl">{card.icon}</span>
+                  <p className="text-white font-black text-2xl text-center leading-tight">{card.label}</p>
+                  {pickedByGroup && (
+                    <div className="bg-black/30 rounded-2xl px-5 py-2 text-center mt-1">
+                      <p className="text-white/70 text-sm">Nhóm</p>
+                      <p className="text-white font-black text-xl">{pickedByGroup.name}</p>
+                      {isActive && <span className="text-orange-300 text-sm">🎤 Present</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Groups status */}
+      <div className="flex flex-wrap justify-center gap-3 flex-shrink-0">
+        {groups.map((g) => {
+          const hasCard = !!groupCards[g.id];
+          return (
+            <div key={g.id} className={`px-6 py-3 rounded-2xl text-xl font-bold transition-all
+              ${g.id === activeGroup ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30 scale-110"
+              : hasCard ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400"
+              : "bg-white/5 text-gray-500"}`}>
+              {g.name} {hasCard ? "✓" : "⌛"}
+              {g.id === activeGroup && <span className="block text-sm font-normal opacity-80">🎤 Present</span>}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-// Stage 5: DNA Sharing
-function HostDNASharing({ totalHearts, sessionData }) {
+// Stage 5: DNA Sharing — Không hiện số tim, chỉ floating hearts
+function HostDNASharing({ sessionData }) {
   const title = sessionData?.stageConfig?.[5]?.title || "DNA SHARING";
   const subtitle = sessionData?.stageConfig?.[5]?.subtitle || "Lắng nghe những câu chuyện thực tế";
   return (
@@ -336,8 +472,8 @@ function HostDNASharing({ totalHearts, sessionData }) {
         <span className="w-4 h-4 rounded-full bg-purple-400 animate-pulse" />
         <span className="text-purple-400 text-3xl font-black tracking-widest">STAGE 5 — {title}</span>
       </div>
-      <h2 className="text-8xl font-black text-white">{subtitle}</h2>
-      <p className="text-[10rem] font-black text-rose-400 leading-none">{totalHearts} ❤️</p>
+      <h2 className="text-7xl font-black text-white text-center leading-tight max-w-4xl">{subtitle}</h2>
+      <p className="text-gray-400 text-2xl">Thả tim ủng hộ người chia sẻ ❤️</p>
     </div>
   );
 }
@@ -350,42 +486,42 @@ function HostKeywords({ keywords, sessionData }) {
   const subtitle = sessionData?.stageConfig?.[6]?.subtitle || "";
 
   useEffect(() => {
-    // FIX 6: y bắt đầu từ 18% để tránh đè lên header
+    // Kích thước lớn hơn, y bắt đầu từ 18% để tránh đè header
     const placed = allWords.map((word, i) => ({
       word, id: i,
       x: 3 + Math.random() * 88,
       y: 18 + Math.random() * 72,
-      size: 32 + Math.random() * 40,
-      delay: Math.random() * 3,
-      speed: 3 + Math.random() * 4,
+      size: 48 + Math.random() * 56,
+      delay: Math.random() * 4,
+      speed: 2.5 + Math.random() * 3,
     }));
     setFloaters(placed);
   }, [keywords.length]);
 
   return (
-    // FIX 6: Nền tối để chữ màu emerald nổi bật hơn
-    <div className="relative h-full w-full overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950">
+    // Nền TRẮNG, chữ màu emerald tối nổi bật
+    <div className="relative h-full w-full overflow-hidden bg-white">
       <style>{`
         @keyframes floatKeyword {
-          0% { transform: translateY(0px) rotate(-2deg); }
-          100% { transform: translateY(-20px) rotate(2deg); }
+          0%   { transform: translateY(0px) rotate(-5deg) scale(1); }
+          100% { transform: translateY(-110px) rotate(5deg) scale(1.12); }
         }
       `}</style>
 
-      {/* FIX 6: Header nằm hẳn trên cùng, có backdrop */}
+      {/* Header trắng */}
       <div className="absolute top-0 left-0 right-0 z-20 px-8 py-6"
-        style={{ background: "linear-gradient(to bottom, rgba(3,7,18,0.95) 70%, transparent)" }}>
+        style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.97) 70%, transparent)" }}>
         <div className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-3 bg-emerald-500/20 border border-emerald-500/40 rounded-full px-8 py-3 backdrop-blur-sm">
-            <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-emerald-400 text-2xl font-black tracking-widest">STAGE 6 — {title}</span>
+          <div className="inline-flex items-center gap-3 bg-emerald-100 border border-emerald-300 rounded-full px-8 py-3">
+            <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-emerald-800 text-2xl font-black tracking-widest">STAGE 6 — {title}</span>
           </div>
           <div className="text-right">
-            <p className="text-emerald-400 text-xl font-bold">{allWords.length} keyword</p>
-            <p className="text-gray-500 text-sm">từ {keywords.length} người</p>
+            <p className="text-emerald-700 text-xl font-bold">{allWords.length} keyword</p>
+            <p className="text-gray-400 text-sm">từ {keywords.length} người</p>
           </div>
         </div>
-        {subtitle && <p className="text-gray-400 text-lg mt-2 ml-2">{subtitle}</p>}
+        {subtitle && <p className="text-gray-600 text-lg mt-2 ml-2">{subtitle}</p>}
       </div>
 
       {/* Floating keywords */}
@@ -395,7 +531,7 @@ function HostKeywords({ keywords, sessionData }) {
 
       {allWords.length === 0 && (
         <div className="flex items-center justify-center h-full">
-          <p className="text-emerald-600 text-3xl font-bold opacity-50">Chờ mọi người điền keyword…</p>
+          <p className="text-emerald-400 text-3xl font-bold opacity-40">Chờ mọi người điền keyword…</p>
         </div>
       )}
     </div>

@@ -5,6 +5,13 @@ import { ref, set, push, onValue, get } from "firebase/database";
 import Head from "next/head";
 import { CULTURE_VALUES } from "../data/cultureValues";
 
+const DEFAULT_CARDS_FALLBACK = [
+  { id: "c1", icon: "🎯", label: "BỔN PHẬN", color: "from-emerald-500 to-green-400", back: "from-emerald-900 to-green-900" },
+  { id: "c2", icon: "🤝", label: "HƯỚNG ĐẾN KHÁCH HÀNG", color: "from-teal-500 to-cyan-400", back: "from-teal-900 to-cyan-900" },
+  { id: "c3", icon: "⭐", label: "THEO ĐUỔI SỰ XUẤT SẮC", color: "from-green-500 to-emerald-400", back: "from-green-900 to-emerald-900" },
+  { id: "c4", icon: "🏆", label: "HƯỚNG ĐẾN KẾT QUẢ", color: "from-cyan-500 to-teal-400", back: "from-cyan-900 to-teal-900" },
+];
+
 //test
 function getUserId() {
   if (typeof window === "undefined") return null;
@@ -76,8 +83,14 @@ function StageWaiting({ userName }) {
 
 // ── Stage 1: Ice Breaking ─────────────────────────────────────────────────────
 function StageIceBreaking({ userId }) {
-  const [heartCount, setHeartCount] = useState(0); const [burst, setBurst] = useState(false);
-  useEffect(() => { const u = onValue(ref(db, "hearts"), (s) => setHeartCount(s.exists() ? Object.keys(s.val()).length : 0)); return () => u(); }, []);
+  const [heartCount, setHeartCount] = useState(0);
+  const [myHearts, setMyHearts] = useState(0);
+  const [burst, setBurst] = useState(false);
+  useEffect(() => {
+    const u1 = onValue(ref(db, "hearts"), (s) => setHeartCount(s.exists() ? Object.keys(s.val()).length : 0));
+    const u2 = onValue(ref(db, `scores/${userId}/hearts`), (s) => setMyHearts(s.exists() ? s.val() : 0));
+    return () => { u1(); u2(); };
+  }, [userId]);
   async function sendHeart() {
     setBurst(true); setTimeout(() => setBurst(false), 500);
     await push(ref(db, "hearts"), { userId, ts: Date.now() });
@@ -95,7 +108,11 @@ function StageIceBreaking({ userId }) {
         <p className="text-gray-400 text-sm mt-2">Thả tim để làm nóng không khí! 🔥</p>
       </div>
       <button onClick={sendHeart} className={`w-28 h-28 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 text-6xl flex items-center justify-center shadow-xl active:scale-90 transition-all ${burst ? "scale-110" : "scale-100"}`}>❤️</button>
-      <div className="text-center"><span className="text-white font-black text-4xl">{heartCount}</span><p className="text-gray-400 text-sm">tim đã gửi</p></div>
+      <div className="text-center">
+        <span className="text-white font-black text-4xl">{heartCount}</span>
+        <p className="text-gray-400 text-sm">tim đã gửi</p>
+        {myHearts > 0 && <p className="text-rose-400 text-xs mt-1">Bạn: <span className="font-bold">{myHearts}</span> tim ❤️</p>}
+      </div>
     </div>
   );
 }
@@ -261,49 +278,41 @@ function StageGiaiMaHanhVi({ userId, userName, sessionData }) {
   );
 }
 
-// ── Stage 4: Thảo Luận Nhóm — Card Flip ──────────────────────────────────────
-const CARD_THEMES = [
-  { icon: "🎯", label: "BỔN PHẬN", color: "from-emerald-500 to-green-400", back: "from-emerald-900 to-green-900" },
-  { icon: "🤝", label: "HƯỚNG ĐẾN\nKHÁCH HÀNG", color: "from-teal-500 to-cyan-400", back: "from-teal-900 to-cyan-900" },
-  { icon: "⭐", label: "THEO ĐUỔI\nSỰ XUẤT SẮC", color: "from-green-500 to-emerald-400", back: "from-green-900 to-emerald-900" },
-  { icon: "🏆", label: "HƯỚNG ĐẾN\nKẾT QUẢ", color: "from-cyan-500 to-teal-400", back: "from-cyan-900 to-teal-900" },
-];
+// ── Stage 4: Thảo Luận Nhóm — Lật thẻ chọn cho nhóm ────────────────────────
+function StageCardReveal({ cards, myGroupId, groupCards, onPickCard }) {
+  const myCardId = myGroupId ? (groupCards || {})[myGroupId] : null;
+  const takenByOthers = Object.entries(groupCards || {})
+    .filter(([gid]) => gid !== myGroupId)
+    .map(([, cardId]) => cardId);
+  const [tapped, setTapped] = useState(null);
 
-function CardFlip({ theme, flipped, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{ perspective: "800px", cursor: flipped ? "default" : "pointer" }}
-      className="w-full aspect-[3/4]"
-    >
-      <div style={{
-        position: "relative", width: "100%", height: "100%",
-        transformStyle: "preserve-3d",
-        transition: "transform 0.6s cubic-bezier(.4,2,.6,1)",
-        transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
-      }}>
-        {/* Back side (face down) */}
-        <div style={{ backfaceVisibility: "hidden", position: "absolute", inset: 0 }}
-          className={`rounded-2xl bg-gradient-to-br ${theme.back} border-2 border-white/10 flex items-center justify-center shadow-xl`}>
-          <span className="text-4xl opacity-30">🎴</span>
+  function handlePick(cardId) {
+    if (!myGroupId || takenByOthers.includes(cardId) || tapped) return;
+    setTapped(cardId);
+    setTimeout(() => onPickCard(cardId), 650);
+  }
+
+  if (myCardId) {
+    const myCard = (cards || []).find((c) => c.id === myCardId);
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-emerald-950 flex flex-col items-center justify-center gap-6 px-4">
+        <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-full px-4 py-1.5">
+          <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+          <span className="text-orange-400 text-xs font-semibold tracking-widest">STAGE 4 — THẢO LUẬN NHÓM</span>
         </div>
-        {/* Front side (face up) */}
-        <div style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)", position: "absolute", inset: 0 }}
-          className={`rounded-2xl bg-gradient-to-br ${theme.color} flex flex-col items-center justify-center gap-2 p-3 shadow-xl`}>
-          <span className="text-3xl">{theme.icon}</span>
-          <p className="text-white font-black text-xs text-center leading-tight whitespace-pre-line">{theme.label}</p>
+        <p className="text-gray-400 text-sm">Nhóm bạn đã lật thẻ:</p>
+        {myCard && (
+          <div className={`w-44 h-60 rounded-3xl bg-gradient-to-br ${myCard.color} flex flex-col items-center justify-center gap-3 shadow-2xl ring-4 ring-white/40`}>
+            <span className="text-5xl">{myCard.icon}</span>
+            <p className="text-white font-black text-base text-center px-4 leading-tight">{myCard.label}</p>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <p className="text-emerald-400 text-sm font-semibold">Chờ Host bắt đầu thảo luận…</p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function StageCardReveal({ onDone }) {
-  const [flipped, setFlipped] = useState([false, false, false, false]);
-  const allFlipped = flipped.every(Boolean);
-
-  function flipCard(i) {
-    setFlipped((prev) => prev.map((v, idx) => idx === i ? true : v));
+    );
   }
 
   return (
@@ -313,23 +322,49 @@ function StageCardReveal({ onDone }) {
           <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
           <span className="text-orange-400 text-xs font-semibold tracking-widest">STAGE 4 — THẢO LUẬN NHÓM</span>
         </div>
-        <h2 className="text-xl font-black text-white">Lật bài để khám phá</h2>
-        <p className="text-gray-400 text-sm mt-1">4 giá trị văn hóa OPPO</p>
+        <h2 className="text-xl font-black text-white">Lật thẻ để chọn cho nhóm</h2>
+        <p className="text-gray-400 text-sm mt-1">Mỗi nhóm chỉ được lật <span className="text-orange-400 font-bold">1 thẻ duy nhất</span></p>
       </div>
-
+      {!myGroupId && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 text-center">
+          <p className="text-yellow-400 text-sm">⚠️ Bạn chưa được xếp nhóm. Chờ Host chia nhóm…</p>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 flex-1">
-        {CARD_THEMES.map((theme, i) => (
-          <CardFlip key={i} theme={theme} flipped={flipped[i]} onClick={() => flipCard(i)} />
-        ))}
+        {(cards || []).map((card) => {
+          const isTaken = takenByOthers.includes(card.id);
+          const isFlipping = tapped === card.id;
+          return (
+            <div key={card.id} onClick={() => handlePick(card.id)}
+              style={{ perspective: "1000px", cursor: isTaken || !myGroupId ? "not-allowed" : "pointer" }}
+              className={`aspect-[3/4] relative ${isTaken ? "opacity-30" : ""}`}>
+              <div style={{
+                transformStyle: "preserve-3d",
+                transition: "transform 0.65s cubic-bezier(.4,2,.6,1)",
+                transform: isFlipping ? "rotateY(180deg)" : "rotateY(0deg)",
+                width: "100%", height: "100%", position: "relative"
+              }}>
+                {/* Mặt úp */}
+                <div style={{ backfaceVisibility: "hidden", position: "absolute", inset: 0 }}
+                  className={`rounded-2xl bg-gradient-to-br ${card.back || "from-gray-800 to-gray-700"} flex flex-col items-center justify-center gap-2 border border-white/10 shadow-xl`}>
+                  {isTaken ? <span className="text-3xl">🔒</span> : (
+                    <>
+                      <span className="text-5xl opacity-20">🎴</span>
+                      <p className="text-white/30 text-xs">Bấm để lật</p>
+                    </>
+                  )}
+                </div>
+                {/* Mặt ngửa */}
+                <div style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)", position: "absolute", inset: 0 }}
+                  className={`rounded-2xl bg-gradient-to-br ${card.color} flex flex-col items-center justify-center gap-2 p-3 shadow-xl`}>
+                  <span className="text-4xl">{card.icon}</span>
+                  <p className="text-white font-black text-sm text-center leading-tight">{card.label}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
-
-      <button
-        onClick={onDone}
-        disabled={!allFlipped}
-        className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-400 text-white font-black text-lg disabled:opacity-30 active:scale-95 transition-all shadow-lg"
-      >
-        {allFlipped ? "Bắt đầu thảo luận →" : `Lật hết ${flipped.filter(Boolean).length}/4 lá bài`}
-      </button>
     </div>
   );
 }
@@ -337,35 +372,35 @@ function StageCardReveal({ onDone }) {
 function StageThaoLuanNhom({ userId, sessionData }) {
   const groups = sessionData?.groups || [];
   const activeGroup = sessionData?.activeGroup || null;
+  const groupCards = sessionData?.groupCards || {};
+  const cards = sessionData?.cards || DEFAULT_CARDS_FALLBACK;
   const [heartCount, setHeartCount] = useState(0);
   const [burst, setBurst] = useState(false);
-  // FIX 1: cardsRevealed dùng localStorage để chỉ show 1 lần
-  const [cardsRevealed, setCardsRevealed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("s4_cards_revealed") === "true";
-  });
 
   const myGroup = groups.find((g) => (g.members || []).includes(userId));
+  const myGroupId = myGroup?.id || null;
+  const myCardId = myGroupId ? groupCards[myGroupId] : null;
   const activeGroupData = groups.find((g) => g.id === activeGroup);
+  const activeGroupCard = activeGroup ? cards.find((c) => c.id === groupCards[activeGroup]) : null;
 
   useEffect(() => {
     const u = onValue(ref(db, "groupHearts"), (s) => setHeartCount(s.exists() ? Object.keys(s.val()).length : 0));
     return () => u();
   }, []);
 
-  function handleCardsDone() {
-    localStorage.setItem("s4_cards_revealed", "true");
-    setCardsRevealed(true);
+  async function pickCard(cardId) {
+    if (!myGroupId) return;
+    await set(ref(db, `session/groupCards/${myGroupId}`), cardId);
   }
 
-  // FIX 1: Bỏ điều kiện isActive — ai cũng tim được
   async function sendHeart() {
     setBurst(true); setTimeout(() => setBurst(false), 500);
     await push(ref(db, "groupHearts"), { userId, ts: Date.now() });
   }
 
-  if (!cardsRevealed) {
-    return <StageCardReveal onDone={handleCardsDone} />;
+  // Chưa chọn thẻ → show card selection
+  if (!myCardId) {
+    return <StageCardReveal cards={cards} myGroupId={myGroupId} groupCards={groupCards} onPickCard={pickCard} />;
   }
 
   return (
@@ -386,15 +421,33 @@ function StageThaoLuanNhom({ userId, sessionData }) {
         )}
       </div>
 
+      {/* Thẻ nhóm đã chọn */}
+      {(() => { const card = cards.find((c) => c.id === myCardId); return card ? (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4">
+          <div className={`w-14 h-16 rounded-xl bg-gradient-to-br ${card.color} flex flex-col items-center justify-center gap-1 flex-shrink-0 shadow-lg`}>
+            <span className="text-xl">{card.icon}</span>
+            <p className="text-white font-black text-center leading-tight px-1" style={{fontSize:"8px"}}>{card.label}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 text-xs">Thẻ nhóm bạn đã chọn</p>
+            <p className="text-white font-black text-sm">{card.label}</p>
+          </div>
+        </div>
+      ) : null; })()}
+
       {/* Đang trình bày */}
       {activeGroupData ? (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center space-y-4">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center space-y-3">
           <p className="text-gray-400 text-sm">Đang trình bày:</p>
           <p className="text-2xl font-black text-white">{activeGroupData.name}</p>
+          {activeGroupCard && (
+            <div className={`mx-auto w-20 h-24 rounded-2xl bg-gradient-to-br ${activeGroupCard.color} flex flex-col items-center justify-center gap-1 shadow-lg`}>
+              <span className="text-xl">{activeGroupCard.icon}</span>
+              <p className="text-white font-black text-center leading-tight px-1" style={{fontSize:"8px"}}>{activeGroupCard.label}</p>
+            </div>
+          )}
           <p className="text-gray-400 text-sm">Thả tim ủng hộ nhóm! ❤️</p>
-          {/* FIX 1: Nút tim luôn hoạt động cho tất cả */}
-          <button
-            onClick={sendHeart}
+          <button onClick={sendHeart}
             className={`w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-rose-500 to-pink-600 text-4xl flex items-center justify-center shadow-xl active:scale-90 transition-all ${burst ? "scale-110" : "scale-100"}`}
           >❤️</button>
           <p className="text-white font-black text-2xl">{heartCount} <span className="text-gray-400 text-sm font-normal">tim</span></p>
@@ -429,8 +482,12 @@ function StageThaoLuanNhom({ userId, sessionData }) {
 
 // ── Stage 5: DNA Sharing ──────────────────────────────────────────────────────
 function StageDNASharing({ userId }) {
-  const [heartCount, setHeartCount] = useState(0); const [burst, setBurst] = useState(false);
-  useEffect(() => { const u = onValue(ref(db, "hearts"), (s) => setHeartCount(s.exists() ? Object.keys(s.val()).length : 0)); return () => u(); }, []);
+  const [myHearts, setMyHearts] = useState(0);
+  const [burst, setBurst] = useState(false);
+  useEffect(() => {
+    const u = onValue(ref(db, `scores/${userId}/hearts`), (s) => setMyHearts(s.exists() ? s.val() : 0));
+    return () => u();
+  }, [userId]);
   async function sendHeart() {
     setBurst(true); setTimeout(() => setBurst(false), 500);
     await push(ref(db, "hearts"), { userId, ts: Date.now() });
@@ -444,7 +501,7 @@ function StageDNASharing({ userId }) {
         <p className="text-gray-400 text-sm mt-2">Thả tim ủng hộ người chia sẻ!</p>
       </div>
       <button onClick={sendHeart} className={`w-28 h-28 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 text-6xl flex items-center justify-center shadow-xl active:scale-90 transition-all ${burst ? "scale-110" : "scale-100"}`}>❤️</button>
-      <p className="text-white font-black text-2xl">{heartCount} <span className="text-gray-400 text-sm font-normal">tim</span></p>
+      {myHearts > 0 && <p className="text-white/60 text-sm">Bạn đã thả: <span className="text-rose-400 font-bold">{myHearts}</span> tim</p>}
     </div>
   );
 }
@@ -551,12 +608,7 @@ export default function EmployeePage() {
     return () => u();
   }, []);
 
-  // Reset card reveal state khi stage thay đổi khỏi stage 4
-  useEffect(() => {
-    if (stage !== 4 && typeof window !== "undefined") {
-      localStorage.removeItem("s4_cards_revealed");
-    }
-  }, [stage]);
+  // groupCards reset handled by Firebase (admin resetParticipants clears session/groupCards)
 
   async function handleJoin(name, dept) {
     const uid = getUserId(); setUserName(name); localStorage.setItem("oppo_name", name);
