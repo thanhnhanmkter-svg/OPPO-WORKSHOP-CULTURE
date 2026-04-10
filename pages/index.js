@@ -548,7 +548,7 @@ function StageKeywords({ userId, userName }) {
       <div className="text-5xl">✨</div>
       <h2 className="text-2xl font-black text-white">Đã gửi keyword!</h2>
       <div className="flex flex-wrap justify-center gap-3 mt-2">
-        {keywords.map((k, i) => <span key={i} className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold px-4 py-2 rounded-full text-sm">{k}</span>)}
+        {keywords.map((k, i) => <span key={i} className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold px-4 py-2 rounded-full text-sm max-w-full truncate">{k}</span>)}
       </div>
       <p className="text-gray-400 text-sm mt-2">Hãy xem màn hình chiếu nhé! 🎉</p>
     </div>

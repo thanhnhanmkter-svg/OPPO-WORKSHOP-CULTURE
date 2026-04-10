@@ -45,12 +45,15 @@ function FloatingKeyword({ word, x, y, size, delay, speed }) {
   const color = EMERALD_DARK[Math.floor(Math.abs(word.charCodeAt(0) + x * 7)) % EMERALD_DARK.length];
   return (
     <span
-      className="absolute font-black select-none pointer-events-none"
+      className="absolute font-black select-none pointer-events-none whitespace-nowrap"
       style={{
         left: `${x}%`,
         top: `${y}%`,
         fontSize: size,
         color,
+        maxWidth: '90%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
         animation: `floatKeyword ${speed}s ease-in-out ${delay}s infinite alternate`,
         textShadow: `0 4px 20px ${color}44`,
         filter: `drop-shadow(0 2px 8px ${color}33)`,
@@ -489,7 +492,7 @@ function HostKeywords({ keywords, sessionData }) {
     // Kích thước lớn hơn, y bắt đầu từ 18% để tránh đè header
     const placed = allWords.map((word, i) => ({
       word, id: i,
-      x: 3 + Math.random() * 88,
+      x: 5 + Math.random() * 65, // Giới hạn max 70% để text không bị tràn lề phải
       y: 18 + Math.random() * 72,
       size: 48 + Math.random() * 56,
       delay: Math.random() * 4,
