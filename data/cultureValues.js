@@ -5,11 +5,11 @@ export const CULTURE_VALUES = [
     color: "from-emerald-500 to-green-400",
     icon: "🎯",
     behaviors: [
-      "Loại bỏ các tác động bên ngoài gây dao động, nắm vững phương hướng đúng nên làm",
-      "Dám đặt câu hỏi, dám nêu ý kiến trái chiều, thông qua tư duy logic để nắm bắt rõ bản chất vấn đề",
+      "Không để áp lực và cám dỗ bên ngoài gây dao động, quay về bản chất của sự việc để làm đúng",
+      "Tập trung vào công việc quan trọng nhất",
       "Đặt ra yêu cầu với bản thân chứ không phải người khác, luôn xem lại trách nhiệm bản thân khi gặp vấn đề",
       "Định hướng thái độ hợp tác, tôi không lợi dụng người khác",
-      "Bổn phận cao hơn chữ tín, dù không muốn nhưng thấy nên làm thì sẽ làm",
+      "Bổn phận cao hơn chữ tín, dù không hứa nhưng thấy nên làm thì sẽ làm",
     ],
   },
   {
@@ -20,7 +20,6 @@ export const CULTURE_VALUES = [
     behaviors: [
       "Trực tiếp khảo sát thực tế để hiểu rõ từng nhu cầu của khách hàng",
       "Tập trung vào nhu cầu thiết yếu để tạo ra giá trị thiết thực cho khách hàng",
-      "Lấy khách hàng làm trọng tâm",
     ],
   },
   {
